@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import {GLTFLoader} from '../vendor/loaders/GLTFLoader.js';
+const bytes=fs.readFileSync(new URL('../assets/northbound.glb',import.meta.url));
+const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+let meshes=0,triangles=0;const materials=new Set();
+gltf.scene.traverse(o=>{if(o.isMesh){meshes++;triangles+=(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3;for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m.name);assert.ok(o.geometry.attributes.position.array.every(Number.isFinite),o.name);}});
+for(const name of ['JeepRoot','PlaneRoot','Propeller'])assert.ok(gltf.scene.getObjectByName(name),name);
+assert.ok(meshes>40&&meshes<150);assert.ok(materials.size>15);assert.ok(triangles<200000);
+const box=new THREE.Box3().setFromObject(gltf.scene);assert.ok(box.max.y>10&&box.max.y<40,'Z-up to Y-up conversion');
+console.log(JSON.stringify({meshes,triangles,materials:materials.size,bounds:{min:box.min,max:box.max},bytes:bytes.length},null,2));

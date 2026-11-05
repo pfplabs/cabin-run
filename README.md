@@ -1,24 +1,61 @@
-# Northbound — Cabin Run
+# Northbound — Cabin Run 3D
 
-A dependency-free browser minigame inspired by a lakeside Maya/OpenGL cabin scene from 2013. All artwork is drawn procedurally in Canvas. No external assets, network calls, backend, build tools or accounts are required.
+A real-time Three.js alpine-lake driving and floatplane sandbox, reconstructed from the supplied cabin artwork. The cabin, dock, canoe, jeep, yellow floatplane and Icelandic flag are actual Blender meshes. No original model files were required.
 
-## Play
-Open `index.html` in a modern browser. For development, serve this directory with any static HTTP server. Deploy the files unchanged to any static host.
+This branch replaces the old 2D prototype at the root. The original prototype is preserved under `legacy-2d/`; `main` is unchanged. Nothing has been deployed.
 
-1. Drive the jeep to the three glowing supply crates.
-2. Return to the dock and press E / Space (or tap Load).
-3. Fly through five numbered rings in order.
-4. Return close to the dock and press E / Space (or tap Land).
+## Run locally
 
-Keyboard: WASD or arrow keys. Jeep: directional drive. Floatplane: left/right steer, up boost, down slow. P / Escape pauses. On-screen directional buttons support touch and simultaneous presses. A run auto-pauses on window blur or when the tab is hidden.
+Use a current browser with WebGL 2 and hardware acceleration. No package install or build is required for playing; Three.js and its MIT license are vendored locally.
 
-The clock counts active play only. Rocks, the cabin and the flight boundary add a three-second penalty. Personal best is saved to localStorage when available. Sound effects are opt-in and generated with Web Audio. Restart, pause, victory and replay are included.
+```
+python3 -m http.server 4173
+# Open http://localhost:4173
+```
 
-## Files
-- `index.html`, `styles.css`: responsive interface and accessible native controls.
-- `engine.js`: deterministic state machine and collision/progression rules; also exports as CommonJS for tests.
-- `game.js`: Canvas scene, input, audio and HUD.
-- `test-engine.cjs`: Node built-in assertions. Run `node test-engine.cjs`.
+`npm start` runs the same server. Do not open `index.html` through `file://` because the browser needs HTTP to load modules and the glTF model.
 
-## Notes
-This is an original 2D minigame, not a recreation using the original 3D models. Keyboard and pointer/touch controls are implemented; physical-device testing remains advisable. The best score stays on the current browser/device. No analytics or tracking is included.
+## Explore
+
+- Jeep: W/S or arrows for throttle and reverse, A/D or arrows to steer, Shift to accelerate, Control to brake.
+- Floatplane: A/D steers, W climbs, S descends, Shift boosts, Control slows.
+- V switches between the jeep road start and floatplane lake start. This is a convenient scene selector, not an in-world boarding interaction.
+- Space parks near the house, moors the plane near the dock, or takes off after mooring.
+- C cycles chase, free-look and cabin cameras. Drag in chase mode to look around.
+- P or Escape pauses. Losing focus pauses the simulation and clears held controls.
+- On-screen multi-touch driving/flight controls are provided for small/coarse-pointer screens.
+- Sound is opt-in. No accounts, analytics, tracking, remote assets or gameplay network calls.
+
+The flat scenic road is approximately 590 metres around a small bounded lake. The hard vehicle boundary is visible through roadside posts, surrounding slopes and the forest. Flight stays within the valley and has a 42 m altitude ceiling. There are no crates, rings, races or imposed objectives.
+
+## Rebuild the Blender assets
+
+Requires Blender 4.3 or later:
+
+```
+blender --background --threads 4 --python scripts/build_scene.py
+```
+
+Outputs `assets/northbound.blend`, `assets/northbound.glb` and a Blender preview. The procedural Blender source retains all dimensions and object labels; the exported scene batches static meshes by material for runtime efficiency. Runtime creates the bounded surrounding terrain, roadway, vegetation, sky and reflective animated lake.
+
+## Checks
+
+```
+npm test
+npm install
+node scripts/inspect-scene.mjs
+```
+
+The Node tests cover driving, flight, boundaries, collision, pause/resume/restart, vehicle switching, and continuous input-driven trips from spawn to house and plane launch to dock. Scene validation parses the real GLB with Three.js, checks named vehicle roots, finite geometry and triangle/draw-call budgets.
+
+`?qa=1` enables `window.cabinQA` for deterministic test setup. `window.cabinDiagnostics()` is read-only and reports scene/renderer/simulation details. Normal play does not expose state-changing debug controls.
+
+## Art and verification status
+
+This is an initial 3D reconstruction, not a claim of photorealistic parity with the modern reference rendering. Modeling, textured materials, lighting and vegetation remain iterative. `assets/northbound.blend` is the editable source, not a gameplay capture. The browser scene adds live reflections, atmospheric sky, shadows and procedural surface textures.
+
+The cloud browser available during initial implementation disabled WebGL. Simulation and GLB structure were tested there; actual browser rendering, controls, mobile touch and frame rate need a WebGL-capable browser. See `QA.md`. Never describe a Blender preview as captured gameplay.
+
+## Third-party software
+
+Three.js 0.183.2, MIT. See `vendor/THREE-LICENSE`. Scene geometry and procedural textures were newly created for this project; supplied reference images are not redistributed in this public repository.
