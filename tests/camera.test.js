@@ -22,12 +22,12 @@ function fixture(phase='jeep',heightAt=()=>-3){
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 const pointer=(id,x,y)=>({pointerId:id,pointerType:'touch',pageX:x,pageY:y,clientX:x,clientY:y});
 
-test('both vehicles follow translation without heading snapping or losing zoom',()=>{
+test('both vehicles follow translation without losing orbit or zoom',()=>{
  for(const phase of ['jeep','plane']){
   const {rig,state,camera}=fixture(phase);
   near(camera.position.distanceTo(rig.target),phase==='plane'?21:11);
   const offset=camera.position.clone().sub(rig.target);
-  Object.assign(state,{x:100,y:27,z:-44,heading:2});rig.update(state,1/60);
+  Object.assign(state,{x:100,y:27,z:-44});rig.update(state,1/60);
   assert.ok(camera.position.clone().sub(rig.target).distanceTo(offset)<1e-8);
   near(rig.target.y,state.y+(phase==='plane'?1.8:2));rig.dispose();
  }
@@ -37,7 +37,7 @@ test('wheel zoom and bounds, orbit wider limit and phase reset',()=>{
  const start=camera.position.distanceTo(rig.target);
  canvas.emit('wheel',{deltaY:-100,deltaMode:0,ctrlKey:false,clientX:500,clientY:400});
  assert.ok(camera.position.distanceTo(rig.target)<start);
- camera.position.copy(rig.target).add(new Vector3(0,20,400));rig.update(state,.016);
+ rig.desiredCamera.position.copy(rig.target).add(new Vector3(0,20,400));rig.update(state,.016);
  near(camera.position.distanceTo(rig.target),50);
  rig.setMode('orbit',state);assert.equal(rig.controls.maxDistance,200);
  state.phase='plane';rig.update(state,.016);near(camera.position.distanceTo(rig.target),21);
@@ -79,7 +79,69 @@ test('mouse drag rotates and minimum radius and polar angle are enforced',()=>{
  assert.ok(camera.position.distanceTo(initial)>.1);
  doc.emit('pointerup',{...pointer(1,200,150),pointerType:'mouse'});
  rig.setEnabled(false);rig.setEnabled(true);
- camera.position.copy(rig.target).add(new Vector3(0,-.1,.1));rig.update(state,.016);
+ rig.desiredCamera.position.copy(rig.target).add(new Vector3(0,-.1,.1));rig.update(state,.016);
  near(camera.position.distanceTo(rig.target),4);
  assert.ok(rig.controls.getPolarAngle()<=Math.PI*.48+1e-8);rig.dispose();
+});
+const yaw=rig=>{const v=rig.desiredCamera.position.clone().sub(rig.target);return Math.atan2(-v.x,v.z);};
+const wrapped=a=>Math.atan2(Math.sin(a),Math.cos(a));
+test('chase eases steering while preserving user offset and zoom for both vehicles',()=>{
+ for(const phase of ['jeep','plane']){
+  const {rig,state}=fixture(phase);
+  rig.desiredCamera.position.sub(rig.target).applyAxisAngle(new Vector3(0,1,0),-.7).add(rig.target);
+  const radius=rig.desiredCamera.position.distanceTo(rig.target),start=yaw(rig);
+  state.heading+=1;rig.update(state,.016);
+  const first=wrapped(yaw(rig)-start);assert.ok(first>0&&first<.15);
+  for(let n=0;n<180;n++)rig.update(state,1/60);
+  assert.ok(Math.abs(wrapped(yaw(rig)-state.heading)-.7)<1e-5);
+  near(rig.desiredCamera.position.distanceTo(rig.target),radius);
+  rig.setEnabled(false);const paused=yaw(rig);state.heading+=1;rig.update(state,.1);near(yaw(rig),paused);
+  rig.dispose();
+ }
+});
+test('heading follow crosses wraparound on shortest arc, free look stays world-relative',()=>{
+ const {rig,state}=fixture();state.heading=Math.PI-.03;rig.reset(state);
+ const start=yaw(rig);state.heading=-Math.PI+.03;rig.update(state,.02);
+ const turn=wrapped(yaw(rig)-start);assert.ok(turn>0&&turn<.02);
+ rig.setMode('orbit',state);const free=yaw(rig);state.heading+=1;rig.update(state,.1);near(yaw(rig),free);rig.dispose();
+});
+test('trackpad diagonal and vertical tail orbit, pinch zooms, ordinary wheel zooms',()=>{
+ const {rig,canvas}=fixture();const before=rig.desiredCamera.position.clone(),radius=rig.desiredCamera.position.distanceTo(rig.target);
+ canvas.emit('wheel',{deltaX:40,deltaY:20,deltaMode:0,timeStamp:1000});
+ assert.ok(rig.desiredCamera.position.distanceTo(before)>.1);near(rig.desiredCamera.position.distanceTo(rig.target),radius);
+ const height=rig.desiredCamera.position.y;
+ canvas.emit('wheel',{deltaX:0,deltaY:15,deltaMode:0,timeStamp:1030});
+ assert.notEqual(rig.desiredCamera.position.y,height);near(rig.desiredCamera.position.distanceTo(rig.target),radius);
+ canvas.emit('wheel',{deltaX:0,deltaY:-20,deltaMode:0,ctrlKey:true,timeStamp:1050});
+ assert.ok(rig.desiredCamera.position.distanceTo(rig.target)<radius);
+ const pinched=rig.desiredCamera.position.distanceTo(rig.target);
+ canvas.emit('wheel',{deltaX:0,deltaY:50,deltaMode:0,timeStamp:1500});
+ assert.ok(rig.desiredCamera.position.distanceTo(rig.target)>pinched);
+ const beforeShift=yaw(rig),shiftRadius=rig.desiredCamera.position.distanceTo(rig.target);
+ canvas.emit('wheel',{deltaX:0,deltaY:20,deltaMode:0,shiftKey:true,timeStamp:1900});
+ assert.notEqual(yaw(rig),beforeShift);near(rig.desiredCamera.position.distanceTo(rig.target),shiftRadius);rig.dispose();
+});
+test('obstruction only changes rendered camera, and preferred zoom returns on release',()=>{
+ const {rig,state,camera,canvas}=fixture();let blocked=true,calls=0;
+ rig.resolveCamera=({target,desiredPosition:desired,state:s,dt})=>{
+  assert.equal(s,state);assert.ok(dt>=0);calls++;
+  return blocked?target.clone().lerp(desired,.3):desired;
+ };
+ const desired=rig.desiredCamera.position.clone();rig.update(state,.016);assert.equal(calls,1);
+ assert.ok(camera.position.distanceTo(desired)>1);near(rig.desiredCamera.position.distanceTo(desired),0);
+ canvas.emit('wheel',{deltaY:-50,deltaMode:0});const zoom=rig.desiredCamera.position.distanceTo(rig.target);
+ assert.ok(zoom<11&&zoom>9);assert.ok(camera.position.distanceTo(rig.target)<4);
+ blocked=false;rig.update(state,.016);near(camera.position.distanceTo(rig.target),zoom);rig.dispose();
+});
+test('active trackpad and pinch consume browser defaults; pause clears the trackpad latch',()=>{
+ const {rig,canvas}=fixture();let prevented=0;
+ const preventDefault=()=>prevented++;
+ canvas.emit('wheel',{deltaX:30,deltaY:10,deltaMode:0,timeStamp:1000,preventDefault});
+ canvas.emit('wheel',{deltaX:0,deltaY:-10,deltaMode:0,ctrlKey:true,timeStamp:1010,preventDefault});
+ assert.equal(prevented,2);
+ canvas.emit('wheel',{deltaX:30,deltaY:10,deltaMode:0,timeStamp:1020,preventDefault});
+ rig.setEnabled(false);rig.setEnabled(true);
+ const radius=rig.desiredCamera.position.distanceTo(rig.target);
+ canvas.emit('wheel',{deltaX:0,deltaY:40,deltaMode:0,timeStamp:1030,preventDefault});
+ assert.ok(rig.desiredCamera.position.distanceTo(rig.target)>radius);rig.dispose();
 });

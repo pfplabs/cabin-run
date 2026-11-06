@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {CameraRig} from './camera-rig.js';
+import {CameraObstruction} from './camera-collision.js';
 import {HDRLoader} from 'three/addons/loaders/HDRLoader.js';
 import {Water} from './vendor/Water.js';
 import * as E from './engine.js';
@@ -20,7 +21,8 @@ renderer.outputColorSpace=THREE.SRGBColorSpace;
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x9fbac5,.0021);
 const camera=new THREE.PerspectiveCamera(49,innerWidth/innerHeight,.2,3000);
 camera.position.set(-49,24,55);camera.lookAt(0,4,-7);
-const cameraRig=new CameraRig(camera,canvas,{heightAt:landscapeHeight});cameraRig.setMode('cabin',state);
+const cameraObstacles=[],cameraObstruction=new CameraObstruction({heightAt:landscapeHeight,obstacles:cameraObstacles});
+const cameraRig=new CameraRig(camera,canvas,{heightAt:landscapeHeight,resolveCamera:options=>cameraObstruction.resolve(options)});cameraRig.setMode('cabin',state);
 const ambient=new THREE.HemisphereLight(0xd6e4ec,0x44433b,.9);scene.add(ambient);
 const sunDirection=new THREE.Vector3(-.6,.48,.55).normalize();
 const sun=new THREE.DirectionalLight(0xffebd4,3.1);sun.position.copy(sunDirection).multiplyScalar(110);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-100;sun.shadow.camera.right=100;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;sun.shadow.camera.near=1;sun.shadow.camera.far=300;sun.shadow.bias=-.00025;sun.shadow.normalBias=.035;scene.add(sun,sun.target);
@@ -84,7 +86,8 @@ terrainMaterial.onBeforeCompile=shader=>{
  diffuseColor.rgb=mix(diffuseColor.rgb,stone,rock);
  `);
 };
-const ground=new THREE.Mesh(groundGeo,terrainMaterial);ground.receiveShadow=true;scene.add(ground,createLakeDetails(),createSandbar(),createMountainTunnel(),createParkingLot());
+const ground=new THREE.Mesh(groundGeo,terrainMaterial);ground.receiveShadow=true;const tunnel=createMountainTunnel();scene.add(ground,createLakeDetails(),createSandbar(),tunnel,createParkingLot());
+tunnel.updateMatrixWorld(true);tunnel.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
 const asphaltMaterial=new THREE.MeshStandardMaterial({...createAsphaltMaps(),color:0xffffff});
 function ribbon(points,width,color,y=.025,material=null,add=true){
  const positions=[],uv=[],indices=[];let distance=0;
@@ -130,6 +133,7 @@ new GLTFLoader().load('./assets/northbound.glb',gltf=>{
  });
  jeep=gltf.scene.getObjectByName('JeepRoot');plane=gltf.scene.getObjectByName('PlaneRoot');propeller=gltf.scene.getObjectByName('Propeller');wheels=['LeftFront','LeftRear','RightFront','RightRear'].map(n=>gltf.scene.getObjectByName('JeepWheel'+n)).filter(Boolean);
  if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
+ gltf.scene.updateMatrixWorld(true);gltf.scene.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o;while(p){if(p===jeep||p===plane)return;p=p.parent;}cameraObstacles.push(o);});
  for(const x of [-.75,.75]){const lamp=new THREE.SpotLight(0xffedca,95,38,.43,.6,2);lamp.position.set(x,1.1,-2);const target=new THREE.Object3D();target.position.set(x,.4,-19);jeep.add(target,lamp);lamp.target=target;}
 
  ready=true;$('#start').disabled=false;$('#start').innerHTML='Take the mountain road <span>↗</span>';$('#fine').textContent='Drive freely · Switch to the floatplane anytime';

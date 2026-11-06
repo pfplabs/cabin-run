@@ -1,10 +1,11 @@
-import {Vector3, MOUSE, TOUCH} from 'three';
+import {Vector3, Spherical, MOUSE, TOUCH} from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
 // OrbitControls listens on ownerDocument during drags. Filter those listeners
 // so a simultaneous finger on a driving button cannot move the camera.
 class CanvasInput {
- constructor(canvas) {
+ constructor(canvas,onWheel) {
+  this.onWheel=onWheel;
   this.canvas=canvas;this.style=canvas.style;this.pointers=new Set();this.listeners=[];
   this.ownerDocument=this.scope(canvas.ownerDocument,true);
   this.root=this.scope(canvas.getRootNode(),false);
@@ -18,6 +19,7 @@ class CanvasInput {
  listen(target,type,fn,options,filter=false) {
   const wrapped=event=>{
    if(filter&&type.startsWith('pointer')&&!this.pointers.has(event.pointerId))return;
+   if(type==='wheel'&&this.onWheel?.(event))return;
    if(type==='pointerdown')this.pointers.add(event.pointerId);
    fn(event);
    if(type==='pointerup'||type==='pointercancel')this.pointers.delete(event.pointerId);
@@ -45,8 +47,11 @@ class CanvasInput {
 }
 
 export class CameraRig {
- constructor(camera,canvas,{heightAt=()=>-3}={}) {
-  this.camera=camera;this.canvas=canvas;this.heightAt=heightAt;
+ constructor(camera,canvas,{heightAt=()=>-3,resolveCamera=null}={}) {
+  this.camera=camera;this.canvas=canvas;this.heightAt=heightAt;this.resolveCamera=resolveCamera;
+  // Input owns this unconstrained pose. Collision correction only changes camera.
+  this.desiredCamera=camera.clone();this.lastState=null;this.headingFollow=0;this.lastTrackpad=-Infinity;
+  this.offset=new Vector3();this.up=new Vector3(0,1,0);this.spherical=new Spherical();
   this.mode='chase';this.enabled=false;this.phase=null;this.disposed=false;
   this.target=new Vector3();this.delta=new Vector3();this.initialized=false;
   this.originalTouchAction=canvas.style.touchAction;this.originalCursor=canvas.style.cursor;
@@ -55,8 +60,9 @@ export class CameraRig {
  _rebuild(){
   if(this.controls)this.controls.dispose();
   if(this.input)this.input.clear();
-  this.input=new CanvasInput(this.canvas);
-  this.controls=new OrbitControls(this.camera,this.input);
+  this.lastTrackpad=-Infinity;
+  this.input=new CanvasInput(this.canvas,event=>this._wheel(event));
+  this.controls=new OrbitControls(this.desiredCamera,this.input);
   Object.assign(this.controls,{enableDamping:true,dampingFactor:.09,enablePan:false,
    rotateSpeed:.65,zoomSpeed:.85,minPolarAngle:.08,maxPolarAngle:Math.PI*.48});
   this.controls.mouseButtons={LEFT:MOUSE.ROTATE,MIDDLE:MOUSE.DOLLY,RIGHT:MOUSE.ROTATE};
@@ -64,6 +70,28 @@ export class CameraRig {
   this.controls.target.copy(this.target);this._limits();
   this.controls.enabled=this.enabled&&this.mode!=='cabin';
   this.controls.update();
+  this.controls.addEventListener('change',()=>{if(this.initialized&&!this.updating&&this.mode!=='cabin')this._render(0);});
+ }
+ _wheel(event){
+  if(!this.enabled||this.mode==='cabin')return false;
+  // Browsers expose wheel deltas, not reliable trackpad/mouse identification.
+  // Horizontal pixel scrolling begins an orbit gesture; its vertical tail stays
+  // orbit for 250 ms. Ctrl-wheel pinch and normal vertical wheel remain zoom.
+  if(event.ctrlKey){this.lastTrackpad=-Infinity;return false;}
+  const now=Number.isFinite(event.timeStamp)?event.timeStamp:Date.now();
+  const horizontal=(event.deltaMode||0)===0&&Math.abs(event.deltaX||0)>1;
+  const orbit=event.shiftKey||horizontal||((event.deltaMode||0)===0&&now-this.lastTrackpad<250);
+  if(!orbit)return false;
+  this.lastTrackpad=now;event.preventDefault();
+  const scale=(event.deltaMode===1?16:1)*.004;
+  this.offset.copy(this.desiredCamera.position).sub(this.target);
+  this.spherical.setFromVector3(this.offset);
+  this.spherical.theta-=(event.deltaX||(event.shiftKey?event.deltaY:0)||0)*scale;
+  this.spherical.phi-=(event.shiftKey&&!event.deltaX?0:event.deltaY||0)*scale;
+  this.spherical.phi=Math.max(this.controls.minPolarAngle,Math.min(this.controls.maxPolarAngle,this.spherical.phi));
+  this.desiredCamera.position.copy(this.target).add(this.offset.setFromSpherical(this.spherical));
+  this.updating=true;this.controls.update();this.updating=false;
+  this._render(0);return true;
  }
  _limits(){
   this.controls.minDistance=this.phase==='plane'?9:4;
@@ -71,21 +99,25 @@ export class CameraRig {
  }
  _target(state){return this.delta.set(state.x,state.y+(state.phase==='plane'?1.8:2),state.z);}
  _cabin(){this.camera.position.set(-49,24,55);this.camera.lookAt(0,4,-7);}
- _clearance(){
+ _render(dt=0){
+  this.camera.position.copy(this.desiredCamera.position);
   const p=this.camera.position,h=this.heightAt(p.x,p.z);
-  if(Number.isFinite(h)&&p.y<Math.max(.6,h+1.2)){
-   p.y=Math.max(.6,h+1.2);this.camera.lookAt(this.controls.target);
-  }
+  if(Number.isFinite(h))p.y=Math.max(p.y,.6,h+1.2);
+  // Resolver may duck the camera after terrain clearance. Its result is never
+  // fed back into desiredCamera, so zoom returns after leaving an obstruction.
+  const resolved=this.resolveCamera?.({target:this.target.clone(),desiredPosition:p.clone(),state:this.lastState,mode:this.mode,dt});
+  if(resolved&&[resolved.x,resolved.y,resolved.z].every(Number.isFinite))p.copy(resolved);
+  this.camera.lookAt(this.target);
  }
  reset(state){
   if(this.disposed)return;
-  this.phase=state.phase;this.initialized=true;this.target.copy(this._target(state));
+  this.lastState=state;this.headingFollow=state.heading;this.phase=state.phase;this.initialized=true;this.target.copy(this._target(state));
   const distance=this.phase==='plane'?21:11,lift=this.phase==='plane'?6.2:4;
   // Preserve the requested actual radius, not just horizontal distance.
   const horizontal=Math.sqrt(distance*distance-lift*lift);
-  this.camera.position.set(state.x-Math.sin(state.heading)*horizontal,this.target.y+lift,state.z+Math.cos(state.heading)*horizontal);
+  this.desiredCamera.position.set(state.x-Math.sin(state.heading)*horizontal,this.target.y+lift,state.z+Math.cos(state.heading)*horizontal);
   this._rebuild();
-  if(this.mode==='cabin')this._cabin();else this._clearance();
+  if(this.mode==='cabin')this._cabin();else this._render();
  }
  setMode(mode,state){
   if(!['chase','orbit','cabin'].includes(mode))throw new RangeError(`Unknown camera mode: ${mode}`);
@@ -99,17 +131,29 @@ export class CameraRig {
   if(this.disposed||this.enabled===!!enabled)return;
   this.enabled=!!enabled;
   // Recreate to discard pending inertia, pointer state and document listeners.
-  this._rebuild();if(this.mode==='cabin')this._cabin();
+  this._rebuild();if(this.mode==='cabin')this._cabin();else if(this.initialized)this._render();
  }
  update(state,dt){
   if(this.disposed)return;
   if(!this.initialized||state.phase!==this.phase)this.reset(state);
   if(this.mode==='cabin'){this._cabin();return;}
+  this.lastState=state;
   this._target(state).sub(this.target);
-  this.camera.position.add(this.delta);this.controls.target.add(this.delta);
+  this.desiredCamera.position.add(this.delta);this.controls.target.add(this.delta);
   this.target.copy(this.controls.target);
-  if(this.enabled)this.controls.update(Math.min(Math.max(dt||0,0),.1));
-  this._clearance();
+  const step=Math.min(Math.max(dt||0,0),.1);
+  if(this.enabled){
+   if(this.mode==='chase'){
+    const difference=Math.atan2(Math.sin(state.heading-this.headingFollow),Math.cos(state.heading-this.headingFollow));
+    const turn=difference*(1-Math.exp(-5*step));this.headingFollow+=turn;
+    this.offset.copy(this.desiredCamera.position).sub(this.target).applyAxisAngle(this.up,-turn);
+    this.desiredCamera.position.copy(this.target).add(this.offset);
+   }else this.headingFollow=state.heading;
+   this.updating=true;
+   this.controls.update(step);
+   this.updating=false;
+  }
+  this._render(step);
  }
  dispose(){
   if(this.disposed)return;

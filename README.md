@@ -21,7 +21,7 @@ python3 -m http.server 4173
 - Floatplane: A/D steers, W climbs, S descends, Shift boosts, Control slows.
 - V switches between the jeep road start and floatplane lake start. This is a convenient scene selector, not an in-world boarding interaction.
 - Space parks near the house, moors the plane near the dock, or takes off after mooring.
-- C cycles close orbit, wide orbit and fixed cabin cameras. Drag to orbit either vehicle, scroll to zoom, or use one-finger orbit and two-finger pinch on touch screens. The camera keeps following while preserving your chosen angle.
+- C cycles close orbit, wide orbit and fixed cabin cameras. Drag to orbit either vehicle, scroll to zoom, or use one-finger orbit and two-finger pinch on touch screens. The close camera smoothly follows steering while preserving your relative orbit angle. Wide orbit stays world-relative. Horizontal/diagonal two-finger trackpad swipes rotate, pinch zooms, and Shift+scroll is an explicit orbit fallback. The camera ducks and moves closer inside the tunnel, then restores your chosen distance.
 - P or Escape pauses. Losing focus pauses the simulation and clears held controls.
 - On-screen multi-touch driving/flight controls are provided for small/coarse-pointer screens.
 - Sound is opt-in. No accounts, analytics, tracking, remote assets or gameplay network calls. Texture credits are linked in the scene and documented in `assets/pbr/SOURCES.md`.
