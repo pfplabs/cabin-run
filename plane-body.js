@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {applyPlaneAirframe} from './plane-airframe.js';
+import {applyPlaneSkin} from './plane-skin.js';
 import {mergeGeometries} from './vendor/utils/BufferGeometryUtils.js';
 
 const V=p=>new THREE.Vector3(...p);
@@ -60,8 +61,17 @@ export function applyPlaneBody(root){
  // Upper nose deck falls away from a split, raked windscreen.
  add(paint,loft([[-2.56,.60,.60,1.6],[-2.1,.62,.48,1.56],[-1.79,.64,.39,1.56]],40));
  // Open U-section beneath the cabin, with no opaque roof through its windows.
- const sections=[[-1.8,.64],[.65,.66],[1.1,.58]],profile=[[-1,1.95],[-1,1.35],[-.77,1.12],[0,1.02],[.77,1.12],[1,1.35],[1,1.95]];
- for(let j=0;j<sections.length-1;j++)for(let i=0;i<profile.length-1;i++){const [z,w]=sections[j],[zz,ww]=sections[j+1],[x,y]=profile[i],[xx,yy]=profile[i+1];add(paint,quad([x*w,y,z],[xx*w,yy,z],[xx*ww,yy,zz],[x*ww,y,zz]));}
+ // Continuous pressed belly: shared vertices smooth the lower cabin skin.
+ // Window sills remain at 1.95 m, leaving the upper cabin genuinely open.
+ const sections=[[-1.8,.64],[-1.3,.655],[-.45,.67],[.25,.67],[.65,.66],[1.1,.58]],verts=[],indices=[],steps=24;
+ for(const [z,w] of sections)for(let i=0;i<=steps;i++){
+  const angle=-Math.PI/2+i/steps*Math.PI;
+  verts.push(w*Math.sin(angle),1.95-.93*Math.cos(angle),z);
+ }
+ for(let j=0;j<sections.length-1;j++)for(let i=0;i<steps;i++){
+  const a=j*(steps+1)+i,b=a+1,c=a+steps+1,d=c+1;indices.push(a,c,b,b,c,d);
+ }
+ const belly=new THREE.BufferGeometry();belly.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));belly.setIndex(indices);belly.computeVertexNormals();add(paint,belly);
  add(paint,loft([[1.1,.58,.63,1.65],[1.55,.48,.48,1.72],[2.3,.30,.31,1.81],[3.2,.15,.17,1.90],[3.7,.08,.10,1.90]],40));
  // Six separate flat panes, with slim seals around a purposeful utility cabin.
  const panes=[];
@@ -73,11 +83,15 @@ export function applyPlaneBody(root){
   for(const points of [front,pilot,rear]){add(glass,quad(...points));for(let i=0;i<4;i++)add(dark,tube(points[i],points[(i+1)%4],.018));}
   add(paint,tube([s*.66,1.95,-.09],[s*.55,2.62,-.09],.028));
   // Door shuts, external pull, hinges and a boarding step.
-  for(const z of [-1.72,-.08])add(dark,tube([s*.655,1.38,z],[s*.655,1.93,z],.008));
+  for(const z of [-1.72,-.08])for(let i=0;i<6;i++){const y=1.38+i*.55/6,yy=y+.55/6,w=z<-.5?.644:.67;const x=h=>s*(w*Math.sqrt(1-((1.95-h)/.93)**2)+.006);add(dark,tube([x(y),y,z],[x(yy),yy,z],.006,6));}
   add(alloy,tube([s*.68,1.80,-.30],[s*.68,1.80,-.50],.018));
   for(const y of [1.48,1.78])add(alloy,box([.04,.06,.11],[s*.66,y,-1.69]));
   add(dark,tube([s*.68,1.13,-.5],[s*.96,.83,-.5],.024));add(alloy,box([.30,.035,.27],[s*.95,.82,-.5]));
-  add(red,quad([s*.666,1.67,-1.74],[s*.666,1.76,-1.74],[s*.666,1.76,.65],[s*.666,1.67,.65]));
+  for(let i=0;i<24;i++){
+   const z=-1.74+i*2.39/24,zz=z+2.39/24;
+   const skin=(h,t)=>{let j=0;while(j<sections.length-2&&t>sections[j+1][0])j++;const [a,w]=sections[j],[b,v]=sections[j+1];return [s*(THREE.MathUtils.lerp(w,v,(t-a)/(b-a))*Math.sqrt(1-((1.95-h)/.93)**2)+.004),h,t];};
+   add(red,quad(skin(1.67,z),skin(1.76,z),skin(1.76,zz),skin(1.67,zz)));
+  }
   add(red,quad([s*.58,1.67,1.1],[s*.58,1.76,1.1],[s*.15,1.94,3.18],[s*.15,1.89,3.18]));
  }
  add(paint,quad([-.52,2.62,-1.10],[.52,2.62,-1.10],[.53,2.57,.66],[-.53,2.57,.66]));
@@ -91,5 +105,5 @@ export function applyPlaneBody(root){
  }
  for(const x of [-.38,-.16,.06,.28]){add(alloy,new THREE.TorusGeometry(.065,.008,6,16).translate(x,1.93,-1.308));add(dark,new THREE.CircleGeometry(.058,16).translate(x,1.93,-1.305));}
  for(const [m,parts] of batches){const prepared=parts.map(g=>{const p=g.index?g.toNonIndexed():g.clone();p.deleteAttribute('uv');return p;});const geometry=mergeGeometries(prepared);const mesh=new THREE.Mesh(geometry,m);mesh.name='Aircraft rebuilt '+m.name;mesh.castShadow=m!==glass;mesh.receiveShadow=m!==glass;plane.add(mesh);stats.addedBatches++;stats.addedTriangles+=geometry.attributes.position.count/3;parts.forEach(g=>g.dispose());prepared.forEach(g=>g.dispose());}
- plane.userData.bodyFidelity=stats;applyPlaneAirframe(plane);return stats;
+ plane.userData.bodyFidelity=stats;applyPlaneAirframe(plane);applyPlaneSkin(plane);return stats;
 }
