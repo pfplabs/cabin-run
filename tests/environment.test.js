@@ -5,7 +5,7 @@ import {createLandscapeGeometry,createLandscapeTiles,createMountainTunnel,create
 import {roadPoint,terrainHeight,LAKE,WORLD,TUNNEL,PARKING,DRIVEWAY,lakeRadius,roadRadius} from '../engine.js';
 
 test('expanded shoreline mesh faces upward and remains inside a modest triangle budget',()=>{
- const g=createLandscapeGeometry();assert.ok(g.index.count/3<180000);
+ const g=createLandscapeGeometry();assert.ok(g.index.count/3<240000);
  assert.ok(g.attributes.position.array.every(Number.isFinite));
  for(let i=0;i<g.attributes.normal.count;i++)assert.ok(g.attributes.normal.getY(i)>=-.001);
  g.computeBoundingBox();assert.ok(g.boundingBox.max.x>1800&&g.boundingBox.min.x<-1800);
@@ -63,3 +63,4 @@ test('terrain tiles preserve all triangles, share buffers and have finite cullin
  const source=createLandscapeGeometry(),tiles=createLandscapeTiles(source);assert.ok(tiles.length>20&&tiles.length<70);assert.equal(tiles.reduce((n,t)=>n+t.index.count,0),source.index.count);
  for(const tile of tiles){assert.equal(tile.attributes.position,source.attributes.position);assert.ok(Number.isFinite(tile.boundingSphere.radius));assert.ok(tile.boundingSphere.radius>0);}
 });
+

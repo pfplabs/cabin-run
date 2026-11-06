@@ -25,7 +25,7 @@ test('road normals face upward and gravel has distinct original detail',()=>{
  const material=createGravelMaterial();assert.ok(material.map.isDataTexture);assert.ok(material.bumpMap.isDataTexture);assert.ok(material.roughness>.9);
 });
 test('gravel classification distinguishes asphalt, shoulders and cabin driveway',()=>{
- const p=roadPoint(Math.PI/2);assert.equal(isGravel(p.x,p.z),false);assert.equal(isGravel(p.x+5,p.z),true);assert.equal(isGravel(-26,-9),false);assert.equal(isGravel(-16,-9),true);
+ const p=roadPoint(-Math.PI/2);assert.equal(isGravel(p.x,p.z),false);assert.equal(isGravel(p.x-5,p.z),true);assert.equal(isGravel(-26,-9),false);assert.equal(isGravel(-16,-9),true);
 });
 test('dust starts on gravel at speed, stays bounded, stops on asphalt and dissipates',()=>{
  const dust=new RoadDust(),p=roadPoint(Math.PI/2),state={phase:'jeep',status:'running',x:p.x,z:p.z,y:p.y,heading:Math.PI,speed:18};

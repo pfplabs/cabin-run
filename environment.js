@@ -1,47 +1,53 @@
+import {gorgeHeight} from './waterfall-bridge.js';
+import {shorelineScale} from './shoreline.js';
 import * as THREE from 'three';
 import {createRockMaterial,createGraniteGeometry} from './landscape-materials.js';
 import {clipRibbonOutsideRoad,createGravelMaterial} from './road-surfaces.js';
-import {LAKE,WORLD,terrainHeight,mountainHeight,roadPoint,TUNNEL,PARKING,DRIVEWAY} from './engine.js';
+import {LAKE,WORLD,terrainHeight,mountainHeight,waterfallHill,lakeRadius,roadOffset,roadPoint,TUNNEL,PARKING,DRIVEWAY} from './engine.js';
 
 const smooth=(a,b,x)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 export function landscapeHeight(x,z){
- const lake=Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz);
+ const lake=lakeRadius(x,z);
  const shoreInner=1-3.42/LAKE.rz,shoreOuter=1+3.99/LAKE.rz;
  if(lake<shoreInner)return -3;
  if(lake<shoreOuter)return THREE.MathUtils.lerp(-3,terrainHeight(x,z),smooth(shoreInner,shoreOuter,lake));
- const outer=Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius);
- if(outer<1.17)return Math.max(terrainHeight(x,z),mountainHeight(x,z));
- const rise=outer-1.17;
- return Math.max(terrainHeight(x,z),mountainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
+ const outer=Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius),rise=Math.max(0,outer-1.17);
+ const roadGround=terrainHeight(x,z),backdrop=outer<1.17?-Infinity:2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22));
+ const natural=Math.max(roadGround,mountainHeight(x,z),waterfallHill(x,z),backdrop);
+ // Keep the paved surface exact even where the pass traverses the outer hills.
+ const blend=smooth(6,35,Math.abs(roadOffset(x,z))),height=THREE.MathUtils.lerp(roadGround,natural,blend);
+ // Uphill tunnel bedrock begins just outside the clear driving envelope.
+ const covered=Math.max(height,mountainHeight(x,z));
+ return gorgeHeight(x,z,covered);
 }
 
 /** Shore-focused annular topology keeps the water edge smooth without a huge grid. */
 export function createLandscapeGeometry(){
  // Keep fine angular samples around the cabin; the distant shore needs half as many.
- const angularSteps=1920,angles=[];for(let i=0;i<=angularSteps;i++){const a=i/angularSteps*Math.PI*2,wrapped=Math.atan2(Math.sin(a),Math.cos(a));if(i%6===0||(wrapped>-.8&&wrapped<.16))angles.push(a);}
+ const angularSteps=1920,angles=[];for(let i=0;i<=angularSteps;i++){const a=i/angularSteps*Math.PI*2,wrapped=Math.atan2(Math.sin(a),Math.cos(a));if(i%6===0||(wrapped>-.8&&wrapped<.16)||(wrapped>.38&&wrapped<2.95&&i%3===0))angles.push(a);}
  const segments=angles.length-1,positions=[],uvs=[],colors=[],indices=[];
  const sections=[],shoreOuter=1+3.99/LAKE.rz;
  for(const r of [0,.88,.94,1-3.42/LAKE.rz,1-1.71/LAKE.rz,1,1+1.71/LAKE.rz,shoreOuter])sections.push({kind:'lake',r});
  // Resolve the carved driveway and parking apron rather than bridging them with long triangles.
- for(let i=1;i<=96;i++)sections.push({kind:'inland',t:i/96});
- for(const offset of [-5.2,-4.2,0,4.2,5.2,6.5])sections.push({kind:'road',offset});
- for(const r of [1.025,1.075,1.12,1.17,1.24,1.34,1.48,1.65,1.85,2.1,2.25,2.45,2.9,3.5])sections.push({kind:'outer',r});
+ for(let i=1;i<=128;i++)sections.push({kind:'inland',t:i/128});
+ for(const offset of [-40,-30,-24,-20,-18,-16,-14,-12,-10,-8,-6.5,-5.2,-4.2,0,4.2,5.2,6.5,10,16,25,40])sections.push({kind:'road',offset});
+ for(const r of [1.075,1.12,1.17,1.24,1.34,1.48,1.65,1.85,2.1,2.25,2.45,2.9,3.5])sections.push({kind:'outer',r});
  const c=new THREE.Color();
  for(let row=0;row<sections.length;row++){
   const section=sections[row];
   for(let i=0;i<=segments;i++){
-   const a=angles[i],sa=Math.sin(a),ca=Math.cos(a),route=roadPoint(a),roadR=Math.hypot(route.x,route.z-WORLD.centerZ);
+   const a=angles[i],shore=shorelineScale(a),sa=Math.sin(a),ca=Math.cos(a),route=roadPoint(a),roadR=Math.hypot(route.x,route.z-WORLD.centerZ);
    let x,z;
-   if(section.kind==='lake'){x=LAKE.rx*section.r*sa;z=LAKE.z-LAKE.rz*section.r*ca;}
-   else if(section.kind==='inland'){x=THREE.MathUtils.lerp(LAKE.rx*shoreOuter,roadR-6,section.t)*sa;z=THREE.MathUtils.lerp(LAKE.z-LAKE.rz*shoreOuter*ca,WORLD.centerZ-(roadR-6)*ca,section.t);}
-   else {const r=section.kind==='road'?roadR+section.offset:roadR*section.r;x=r*sa;z=WORLD.centerZ-r*ca;}
-   const y=landscapeHeight(x,z),lr=Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz);
+   if(section.kind==='lake'){x=LAKE.rx*shore*section.r*sa;z=LAKE.z-LAKE.rz*shore*section.r*ca;}
+   else if(section.kind==='inland'){x=THREE.MathUtils.lerp(LAKE.rx*shore*shoreOuter,roadR-40,section.t)*sa;z=THREE.MathUtils.lerp(LAKE.z-LAKE.rz*shore*shoreOuter*ca,WORLD.centerZ-(roadR-40)*ca,section.t);}
+   else {const r=section.kind==='road'?roadR+section.offset:roadR+(section.r-1)*WORLD.roadRadius;x=r*sa;z=WORLD.centerZ-r*ca;}
+   const y=landscapeHeight(x,z),lr=lakeRadius(x,z);
    positions.push(x,y,z);uvs.push((x+650)/1300,(z-WORLD.centerZ+650)/1300);
    c.set(lr<shoreOuter?0xb8b196:y>66?0xc4c5c0:y>26?0x9ca393:0xffffff);colors.push(c.r,c.g,c.b);
    if(row<sections.length-1&&i<segments){const n=row*(segments+1)+i;indices.push(n,n+1,n+segments+1,n+1,n+segments+2,n+segments+1);}
   }
  }
- const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();g.userData.gridColumns=segments+1;g.userData.gridRows=sections.length;return g;
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();g.userData.gridColumns=segments+1;g.userData.gridRows=sections.length;g.userData.tileBands=[0,...['lake','inland','road'].map(kind=>sections.findLastIndex(s=>s.kind===kind)),sections.length-7,sections.length-1];return g;
 }
 
 export function createAsphaltMaps(){
@@ -65,7 +71,7 @@ export function createLakeDetails(){
  const rockGeometry=createGraniteGeometry({detail:3});
  const rocks=new THREE.InstancedMesh(rockGeometry,createRockMaterial(),700);
  for(let i=0;i<700;i++){
-  const a=random()*Math.PI*2,r=1+(-.34+random()*4)/LAKE.rz,x=LAKE.rx*r*Math.sin(a),z=LAKE.z-LAKE.rz*r*Math.cos(a),s=.24+random()**2*1.8;
+  const a=random()*Math.PI*2,r=1+(-.34+random()*4)/LAKE.rz,x=LAKE.rx*shorelineScale(a)*r*Math.sin(a),z=LAKE.z-LAKE.rz*shorelineScale(a)*r*Math.cos(a),s=.24+random()**2*1.8;
   transform.position.set(x,Math.max(-.22,landscapeHeight(x,z))-.15,z);transform.rotation.set(random()*.5,random()*6.28,random()*.4);transform.scale.set(s*(1+random()*.7),s*.55,s*(.7+random()*.5));transform.updateMatrix();rocks.setMatrixAt(i,transform.matrix);
   color.setHSL(.11,.018+random()*.025,.80+random()*.16);rocks.setColorAt(i,color);
  }rocks.castShadow=rocks.receiveShadow=true;group.add(rocks);
@@ -82,7 +88,7 @@ export function createLakeDetails(){
  const blades=new THREE.BufferGeometry();blades.setAttribute('position',new THREE.Float32BufferAttribute(p,3));blades.setIndex(ix);blades.computeVertexNormals();
  const reeds=new THREE.InstancedMesh(blades,new THREE.MeshStandardMaterial({color:0x737e45,roughness:1,side:THREE.DoubleSide}),3000);
  for(let i=0;i<3000;i++){
-  const a=random()*Math.PI*2,r=1+(3.65+random()*2.05)/LAKE.rz,x=LAKE.rx*r*Math.sin(a),z=LAKE.z-LAKE.rz*r*Math.cos(a),s=.4+random()*.9;
+  const a=random()*Math.PI*2,r=1+(3.65+random()*2.05)/LAKE.rz,x=LAKE.rx*shorelineScale(a)*r*Math.sin(a),z=LAKE.z-LAKE.rz*shorelineScale(a)*r*Math.cos(a),s=.4+random()*.9;
   transform.position.set(x,landscapeHeight(x,z)-.04,z);transform.rotation.set(0,random()*6.28,0);transform.scale.set(s,s,s);transform.updateMatrix();reeds.setMatrixAt(i,transform.matrix);
   color.setHSL(.17+random()*.08,.17+random()*.2,.18+random()*.12);reeds.setColorAt(i,color);
  }reeds.receiveShadow=true;group.add(reeds);
@@ -132,7 +138,7 @@ export function createMountainTunnel(){
   const a=angleAt(j),c=roadPoint(a),sx=Math.sin(a),sz=-Math.cos(a);
   for(let i=0;i<count;i++){
    const q=cross[i],outerX=q.x/TUNNEL.innerHalfWidth*TUNNEL.outerHalfWidth;
-   inner.push(c.x+sx*q.x,c.y+q.y,c.z+sz*q.x);outer.push(c.x+sx*outerX,c.y+q.outerY,c.z+sz*outerX);uv.push(j*.85,i*.35);
+   inner.push(c.x+sx*q.x,c.y+q.y,c.z+sz*q.x);outer.push(c.x+sx*outerX,Math.max(c.y+q.outerY,q.x>0&&i>=3&&i<=arcSteps+3?landscapeHeight(c.x+sx*outerX,c.z+sz*outerX):-Infinity),c.z+sz*outerX);uv.push(j*.85,i*.35);
    // Remove both stone skins, rather than drawing a transparent window over a wall.
    const aperture=i===lakeBand&&windows.some(([start,end])=>j>=start&&j<end);
    if(j<rings&&i<count-1&&!aperture){const n=j*count+i;indices.push(n,n+1,n+count,n+1,n+count+1,n+count);}
@@ -201,7 +207,7 @@ export function createParkingLot(){
 export function createLandscapeTiles(source){
  const columns=source.userData.gridColumns,rows=source.userData.gridRows;
  if(!columns||!rows)throw new TypeError('Expected landscape grid geometry');
- const bands=[0,7,103,109,115,rows-1].filter((v,i,a)=>v<rows&&(i===0||v>a[i-1])),tiles=[],point=new THREE.Vector3();
+ const bands=(source.userData.tileBands||[0,7,135,150,156,rows-1]).filter((v,i,a)=>v<rows&&(i===0||v>a[i-1])),tiles=[],point=new THREE.Vector3();
  for(let col=0;col<columns-1;col+=64)for(let band=1;band<bands.length;band++){
   const index=[],box=new THREE.Box3();
   for(let row=bands[band-1];row<bands[band];row++)for(let c=col;c<Math.min(columns-1,col+64);c++){

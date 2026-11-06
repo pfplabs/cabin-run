@@ -21,7 +21,7 @@ test('jeep accelerates gradually, brakes, reverses and steers in both directions
  step(forward,{up:true,right:true},.3);assert.ok(forward.heading>fh);
 });
 test('jeep cabin, shoreline and outer boundaries stop without bouncing and permit reverse',()=>{
- for(const [x,z,heading] of [[E.CABIN_BOUNDS.minX-.05,-10,Math.PI/2],[-E.LAKE.rx*(1+4/E.LAKE.rz)-.05,E.WORLD.centerZ,Math.PI/2],[-E.WORLD.roadRadius*1.14+.05,E.WORLD.centerZ,-Math.PI/2]]){
+ for(const [x,z,heading] of [[E.CABIN_BOUNDS.minX-.05,-10,Math.PI/2],[E.lakeBoundaryPoint(-Math.PI/2).x*(1+4/E.LAKE.rz)-.05,E.WORLD.centerZ,Math.PI/2],[E.roadPoint(-Math.PI/2).x-77.95,E.WORLD.centerZ,-Math.PI/2]]){
   const s=running();Object.assign(s,{x,z,heading,speed:14});E.update(s,{up:true},.05);assert.ok(Math.abs(s.speed)<.1);assert.equal(s.events.at(-1).type,'bump');
   step(s,{up:true},.5);assert.ok(s.speed<.15,'Holding throttle against wall must not bounce');
   const impact={x:s.x,z:s.z};step(s,{down:true},1);assert.ok(s.speed<0);assert.ok(Math.hypot(s.x-impact.x,s.z-impact.z)>.5);
@@ -112,7 +112,7 @@ test('jeep raised speed limits and floatplane limit are enforced',()=>{
 
 function follow(s,points,speed=7){
  let n=0,maxY=s.y;
- for(let i=0;i<30000&&n<points.length;i++){
+ for(let i=0;i<50000&&n<points.length;i++){
   const p=points[n];if(Math.hypot(p.x-s.x,p.z-s.z)<1.2){n++;continue;}
   const target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));
   E.update(s,{up:s.speed<speed,brake:s.speed>speed+.5,left:error<-.015,right:error>.015},.02);maxY=Math.max(maxY,s.y);
@@ -123,7 +123,7 @@ test('winding road is continuous, elevated, and drivable for a complete loop thr
  const s=onRoad(running()),points=[];
  for(let a=-1.82+.025;a<-1.82+Math.PI*2;a+=.025){
   const p=E.roadPoint(a);near(E.roadOffset(p.x,p.z),0);near(E.terrainHeight(p.x,p.z),p.y);
-  assert.ok(E.roadRadius(p.x,p.z)<1.14);points.push(p);
+  assert.ok(E.roadRadius(p.x,p.z)<2);points.push(p);
  }
  const highest=follow(s,points);assert.ok(highest>34);assert.ok(s.y<3);assert.ok(!s.events.some(e=>e.type==='bump'));
 });
@@ -159,10 +159,10 @@ test('plane boundary warns, permits manual return and resets countdown',()=>{
 });
 test('plane boundary recovers gently after timeout or far excursion and stays bounded',()=>{
  const b=E.FLIGHT_BOUNDARY;
- for(const initial of [{x:E.WORLD.roadRadius*1.2,z:E.WORLD.centerZ,boundaryRemaining:.05},{x:E.WORLD.roadRadius*(b.graceRadius+.01),z:E.WORLD.centerZ},{x:0,z:b.graceNorth-1}]){
+ for(const initial of [{x:E.WORLD.roadRadius*(b.normalRadius+.07),z:E.WORLD.centerZ,boundaryRemaining:.05},{x:E.WORLD.roadRadius*(b.graceRadius+.01),z:E.WORLD.centerZ},{x:0,z:b.graceNorth-1}]){
   const s=startedPlane();Object.assign(s,{y:40,onWater:false,heading:Math.PI/2,throttle:.65,speed:16},initial);
   let recovered=false;
-  for(let i=0;i<1600;i++){
+  for(let i=0;i<3000;i++){
    const heading=s.heading;E.update(s,{},.02);assert.ok(Math.abs(s.heading-heading)<=.65*.02+1e-9,'No forced 180-degree heading snap');
    assert.ok(E.roadRadius(s.x,s.z)<=b.hardRadius+1e-8);assert.ok(s.z>=b.hardNorth);assert.ok(s.y<=E.WORLD.flightCeiling);
    recovered ||= s.boundaryStatus==='recovering';
@@ -212,12 +212,13 @@ test('new cabin foundation is flat and expanded footprint blocks jeep and protec
 
 test('keyboard lane following remains controlled at raised speed through slopes and tunnel',()=>{
  const s=onRoad(running()),lane=1.9;let last=-1.82,progress=0,peak=0,maxGroundError=0;
- for(let i=0;i<20000&&progress<Math.PI*2;i++){
-  const a=Math.atan2(s.x,E.WORLD.centerZ-s.z),p=E.roadPoint(a+.03);
-  p.x+=Math.sin(a+.03)*lane;p.z-=Math.cos(a+.03)*lane;
+ for(let i=0;i<40000&&progress<Math.PI*2;i++){
+  const a=E.roadSample(s.x,s.z).angle,station=E.roadPoint(a),ahead=E.roadPoint(a+.001),stepAngle=Math.max(a>.38&&a<2.95?7:18,s.speed*.8)/Math.hypot(ahead.x-station.x,ahead.z-station.z)*.001,p=E.roadPoint(a+stepAngle),next=E.roadPoint(a+stepAngle+.0001),length=Math.hypot(next.x-p.x,next.z-p.z);
+  const nx=(next.z-p.z)/length,nz=(next.x-p.x)/length;p.x+=nx*lane;p.z-=nz*lane;
   const target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading-s.yawRate*.18),Math.cos(target-s.heading-s.yawRate*.18));
   const oldPitch=s.pitch,oldRoll=s.roll;
-  E.update(s,{up:s.speed<22,left:error<-.01,right:error>.01},1/60);
+  const corner=a>.38&&a<2.95,targetSpeed=corner?8:22;
+  E.update(s,{up:s.speed<targetSpeed,brake:s.speed>targetSpeed+1,left:error<-.01,right:error>.01},1/60);
   const angle=Math.atan2(s.x,E.WORLD.centerZ-s.z);progress+=Math.atan2(Math.sin(angle-last),Math.cos(angle-last));last=angle;
   if(progress>.15)assert.ok(Math.abs(E.roadOffset(s.x,s.z)-lane)<1.6,'Must remain in the selected lane corridor');
   assert.ok(Math.abs(s.pitch-oldPitch)<.025&&Math.abs(s.roll-oldRoll)<.025,'Suspension rotations must not jump');

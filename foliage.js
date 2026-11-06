@@ -1,3 +1,4 @@
+import {WATERCOURSE,streamCenter} from './waterfall-bridge.js';
 import * as THREE from 'three';
 import {WORLD,LAKE,DRIVEWAY,lakeRadius,roadOffset,roadPoint,TUNNEL} from './engine.js';
 
@@ -70,12 +71,13 @@ export function createForest(heightAt,roadRadius){
   const occupied=new Set();
   function valid(x,z,spacing){
     
+    if(z>WATERCOURSE.mouthZ&&z<WATERCOURSE.headZ+10&&Math.abs(x-streamCenter(z))<14)return false;
     if(Math.abs(roadOffset(x,z))<14||lakeRadius(x,z)<1+8.5/LAKE.rz)return false;
     const angle=Math.atan2(x,WORLD.centerZ-z);if(angle>TUNNEL.startAngle-.04&&angle<TUNNEL.endAngle+.04&&Math.abs(roadOffset(x,z))<29)return false;
     // Cabin, terrace and apron remain clear. No stand blocks the access lane.
     if(x>-14&&x<34&&z>-34&&z<12)return false;
     if(DRIVEWAY.some((a,i)=>i&&segmentDistance(x,z,DRIVEWAY[i-1],a)<7.5))return false;
-    if(!Number.isFinite(heightAt(x,z))||heightAt(x,z)<.1)return false;
+    const ground=heightAt(x,z);if(!Number.isFinite(ground)||ground<.1||ground>500)return false;
     const gx=Math.floor(x/spacing),gz=Math.floor(z/spacing),key=`${spacing}:${gx}:${gz}`;
     if(occupied.has(key))return false;occupied.add(key);return true;
   }

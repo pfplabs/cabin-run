@@ -1,3 +1,4 @@
+import {SHORELINE_GLSL} from './shoreline.js';
 import * as THREE from 'three';
 
 /** Original procedural surfaces. World units are metres; no downloaded assets.
@@ -35,7 +36,7 @@ export function createProceduralSurfaceTexture(size=256){
  t.generateMipmaps=true;t.colorSpace=THREE.NoColorSpace;t.needsUpdate=true;return t;
 }
 const shared=()=>sharedSurface??=createProceduralSurfaceTexture();
-const common=`
+const common=SHORELINE_GLSL+`
 varying vec3 vLMWorld;
 varying vec3 vLMWorldNormal;
 uniform sampler2D lmSurface;
@@ -94,7 +95,8 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
     // Texture-only grass detail remains subtle; mineral shader supplies relief.
     float lmSlope=1.-abs(normalize(vLMWorldNormal).y);
     float lmRockMask=smoothstep(.12,.46,lmSlope+(lmLarge.r-.5)*.14);
-    float lmLakeRadius=length((vLMWorld.xz-lmLake.xy)/lmLake.zw);
+    vec2 lmLakeUV=(vLMWorld.xz-lmLake.xy)/lmLake.zw;
+    float lmLakeRadius=length(lmLakeUV)/lakeShoreScale(atan(lmLakeUV.x,-lmLakeUV.y));
     float lmShoreDistance=(lmLakeRadius-1.)*min(lmLake.z,lmLake.w);
     float lmShore=(1.-smoothstep(2.05,7.4,lmShoreDistance))*
       (1.-smoothstep(1.5,4.,vLMWorld.y));

@@ -24,13 +24,14 @@ python 3 -m http.server 4173
 - Plane Control: reduces power in the air. On the water it also brakes the taxi motion. The HUD distinguishes these functions and shows throttle, airspeed and RPM.
 - Landing: approach the cabin between the two buoy lines, reduce power and descend. Touchdown is physical water contact with flare/settling, paired expanding foam rings and a bounded spray burst, not a teleport. Taxi slowly to the extended pier; Space moors within 10 m at under 11 km/h. Space releases the mooring, then another Space starts the engine.
 - V switches vehicle starting points. This remains a quick scene selector, not an on-foot boarding sequence.
+- The north-up minimap shows the actual shore, winding road, bridge/tunnel, cabin/dock, your vehicle and heading.
 - C cycles heading-follow orbit, world-relative wide orbit and a fixed cabin view. Drag to orbit, scroll/pinch to zoom. Horizontal or diagonal trackpad swipes orbit; Shift+scroll is an explicit fallback. The camera ducks inside the tunnel and restores preferred zoom outside.
 - P/Escape pauses. Losing focus pauses and clears held controls. Touch driving buttons, one-finger orbit and two-finger pinch are supported.
 - Sound is opt-in. No accounts, analytics, tracking or gameplay network calls.
 
 ## The valley
 
-The lake is 936 ×684 m, nine times the preceding lake's area and 36 times the first 3D version's area. Cabin, vehicles, human doors, dock and parking retain real-world scale. The approximately 3.63 km road climbs a 70 m ridge, passes through a clean carved tunnel with three real lake-view openings, then descends around the lake.
+The lake occupies a roughly 936 ×684 m basin, with irregular bays and wooded headlands. Its cabin cove, floatplane corridor and southern tributary mouth remain open. Cabin, vehicles, human doors, dock and parking retain real-world scale. The approximately 4.79 km road passes through a 70 m carved tunnel with three lake-view openings, climbs a 220 m forested shoulder through nine alternating S-bends, then descends to a granite bridge above the far-side tributary. The waterfall drops from a wooded 58 m head into the channel beneath the bridge. The tunnel roof joins the uphill bedrock instead of sitting apart from it.
 
 Asphalt is 8.4 m wide. The cabin approach uses the same paving, clipped at the junction to avoid stacked surfaces. Distinct textured gravel shoulders and parking produce speed-dependent tyre dust. The driveway has metre-spaced geometry and is checked against the actual land mesh. Three perpendicular parking bays face a straight access aisle on a level forecourt and serve the enlarged timber cabin, with its balcony, wraparound glazing and furnished interior.
 
@@ -63,7 +64,7 @@ Three.js 0.183.2 is MIT-licensed, see `vendor/THREE-LICENSE`. Texture attributio
 
 ## Latest verification
 
-Automated regressions cover the continuous mountain slope, high summit, pushback, higher flight, cabin parking departure, paired touchdown foam, upright forest cards, sign placement and hero material setup. These are code/geometry checks; the latest visual changes and actual FPS still need a WebGL browser review. The lake outline remains elliptical pending its separate bays-and-shores pass.
+Automated regressions cover the continuous mountain slope, high summit, pushback, higher flight, cabin parking departure, paired touchdown foam, upright forest cards, sign placement and hero material setup. These are code/geometry checks; the latest visual changes and actual FPS still need a WebGL browser review. The irregular shore model is shared by rendering, water tint, collision, forest placement and minimap. New terrain topology remains below 240,000 triangles with separately culled tiles. GPU appearance and actual FPS still require desktop review.
 
 ## Later milestones
 

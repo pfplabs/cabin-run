@@ -1,3 +1,4 @@
+import {shorelineScale} from './shoreline.js';
 /** Pure simulation rules for a small bounded alpine lake. Distances are metres. */
 export const WORLD={scale:6,roadRadius:564,centerZ:352,northLimit:-302,flightNorthLimit:-300,flightCeiling:1400};
 export const JEEP={maxSpeed:22,boostSpeed:28,reverseSpeed:6,wheelbase:2.8,halfTrack:.95,maxSteeringAngle:.55,maxLateralAcceleration:9,acceleration:4.8,braking:8.5};
@@ -5,28 +6,49 @@ export const CABIN_BOUNDS={minX:-4.2,maxX:25.2,minZ:-28,maxZ:-.8,roofHeight:13};
 const jeepState=()=>({steeringAngle:0,acceleration:0,suspensionVelocity:0,groundHeight:null});
 export const FLIGHT={maxSpeed:27,waterHeight:.10,liftSpeed:10,throttleRate:.3,idleRPM:650,maxRPM:2600,startupSeconds:3,waterBrake:7};
 export const LANDING_CORRIDOR={centerX:-25,zStart:250,zEnd:40,width:36,heading:0};
-export const FLIGHT_BOUNDARY={warningRadius:1.02,normalRadius:1.13,graceRadius:1.5,hardRadius:1.65,warningNorth:WORLD.centerZ-WORLD.roadRadius*1.02,normalNorth:WORLD.centerZ-WORLD.roadRadius*1.13,graceNorth:WORLD.centerZ-WORLD.roadRadius*1.5,hardNorth:WORLD.centerZ-WORLD.roadRadius*1.65,returnSeconds:8};
+export const FLIGHT_BOUNDARY={warningRadius:2.3,normalRadius:2.5,graceRadius:2.9,hardRadius:3.2,warningNorth:WORLD.centerZ-WORLD.roadRadius*2.3,normalNorth:WORLD.centerZ-WORLD.roadRadius*2.5,graceNorth:WORLD.centerZ-WORLD.roadRadius*2.9,hardNorth:WORLD.centerZ-WORLD.roadRadius*3.2,returnSeconds:8};
 const flightState=()=>({enginePhase:'off',engineStartRemaining:0,landingStatus:'taxi',landingAligned:false,touchdownAge:-1,elevatorAngle:0,aileronAngle:0,rudderAngle:0,throttle:0,propRPM:0,verticalSpeed:0,yawRate:0,onWater:false,boundaryStatus:'inside',boundaryRemaining:FLIGHT_BOUNDARY.returnSeconds});
 export const LAKE={x:0,z:352,rx:468,rz:342};
+export const BRIDGE={angle:Math.PI,halfAngle:.055,halfWidth:5.6};
 export const TUNNEL={startAngle:.08,endAngle:.36,innerHalfWidth:5.4,outerHalfWidth:11,height:6.4};
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
-const routeRadius=a=>WORLD.roadRadius+36*Math.sin(3*a)+18*Math.sin(7*a);
-const routeHeight=a=>1.1+70*Math.exp(-((wrap(a-.2)/.78)**2));
+const smoothRoute=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);};
+const highRoad=a=>{a=wrap(a);return smoothRoute((a-.38)/1.17)*(1-smoothRoute((a-1.55)/1.40));};
+const routeRadius=a=>WORLD.roadRadius+36*Math.sin(3*a)+18*Math.sin(7*a)+highRoad(a)*(440+135*Math.sin((a-.38)*11));
+// Grade follows travelled distance, not angle: S-bends lengthen the climb without steep spikes.
+const passStart=.38,passPeak=1.55,passEnd=2.95,passSamples=2048,passDistances=new Float64Array(passSamples+1);
+for(let i=1;i<=passSamples;i++){const a=passStart+(passEnd-passStart)*i/passSamples,b=passStart+(passEnd-passStart)*(i-1)/passSamples,ra=routeRadius(a),rb=routeRadius(b);passDistances[i]=passDistances[i-1]+Math.hypot(ra*Math.sin(a)-rb*Math.sin(b),ra*Math.cos(a)-rb*Math.cos(b));}
+const passDistance=a=>{const f=Math.max(0,Math.min(passSamples,(a-passStart)/(passEnd-passStart)*passSamples)),i=Math.min(passSamples-1,Math.floor(f));return passDistances[i]+(passDistances[i+1]-passDistances[i])*(f-i);};
+const climbLength=passDistance(passPeak),descentLength=passDistances[passSamples]-climbLength;
+const passElevation=a=>{a=wrap(a);return a<=passPeak?215*smoothRoute(passDistance(a)/climbLength):215*(1-smoothRoute((passDistance(a)-climbLength)/descentLength));};
+const routeHeight=a=>1.1+70*Math.exp(-((wrap(a-.2)/.78)**2))+passElevation(a)+22*Math.exp(-Math.pow(wrap(a-Math.PI)/.48,4));
 export function roadPoint(a){const r=routeRadius(a);return {x:r*Math.sin(a),y:routeHeight(a),z:WORLD.centerZ-r*Math.cos(a)};}
-export function roadOffset(x,z){const a=Math.atan2(x,WORLD.centerZ-z);return Math.hypot(x,z-WORLD.centerZ)-routeRadius(a);}
+/** Nearest curve station keeps steep S-bend cross-sections level and full-width. */
+export function roadSample(x,z){
+ let a=Math.atan2(x,WORLD.centerZ-z);
+ if(a<=.38||a>=2.95)return {angle:a,y:routeHeight(a),offset:Math.hypot(x,z-WORLD.centerZ)-routeRadius(a)};
+ for(let i=0;i<4;i++){const p=roadPoint(a),l=roadPoint(a-.0001),r=roadPoint(a+.0001),dx=(r.x-l.x)/.0002,dz=(r.z-l.z)/.0002;
+  a+=Math.max(-.12,Math.min(.12,((x-p.x)*dx+(z-p.z)*dz)/(dx*dx+dz*dz)));
+ }
+ const p=roadPoint(a),l=roadPoint(a-.0001),r=roadPoint(a+.0001),side=(x-p.x)*(r.z-l.z)-(z-p.z)*(r.x-l.x);
+ return {angle:wrap(a),y:p.y,offset:Math.sign(side)*Math.hypot(x-p.x,z-p.z)};
+}
+export function roadOffset(x,z){return roadSample(x,z).offset;}
 export const DRIVEWAY=[roadPoint(-.65),{x:-230,z:-28,y:14.5},{x:-130,z:-19,y:8.5},{x:-58,z:-14,y:4},{x:-37,z:-19,y:2},{x:-31,z:-19,y:1.1},{x:-26,z:-19,y:1.1},{x:-26,z:-9,y:1.1},{x:-26,z:3,y:1.1}];
 export const DOCK={x:-23.7,z:30};
 export const DOCK_BOUNDS={minX:-21.20,maxX:-14.925,minZ:2,maxZ:36,maxY:2.025};
 export const HOME={x:-16,z:-9};
 export const PARKING=[{x:-16,z:-16,width:4.6,length:7},{x:-16,z:-9,width:4.6,length:7},{x:-16,z:-2,width:4.6,length:7}];
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-export const lakeRadius=(x,z)=>Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz);
+export function lakeBoundaryPoint(a){const r=shorelineScale(a);return {x:LAKE.rx*r*Math.sin(a),z:LAKE.z-LAKE.rz*r*Math.cos(a)};}
+export const lakeRadius=(x,z)=>Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz)/shorelineScale(Math.atan2(x/LAKE.rx,(LAKE.z-z)/LAKE.rz));
+export const roadLength=()=>{let length=0,p=roadPoint(0);for(let i=1;i<=2048;i++){const q=roadPoint(i/2048*Math.PI*2);length+=Math.hypot(q.x-p.x,q.z-p.z,q.y-p.y);p=q;}return length;};
 export const roadRadius=(x,z)=>Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius);
 const smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 export function terrainHeight(x,z){
- const a=Math.atan2(x,WORLD.centerZ-z),offset=Math.abs(roadOffset(x,z));
+ const station=roadSample(x,z),a=station.angle,offset=Math.abs(station.offset);
  const base=1.1+.12*Math.sin(x*.15)*Math.cos(z*.12);
- const ridge=1-smooth((offset-6)/42);
+ const ridge=1-smooth((offset-6)/(highRoad(a)>0?Math.max(42,routeHeight(a)*1.3):42));
  let height=base+(routeHeight(a)-base)*ridge;
  // Flatten the driveway center and softly blend its shoulders into the ridge.
  let distance=Infinity,driveHeight=height;
@@ -36,7 +58,7 @@ export function terrainHeight(x,z){
   const d=Math.hypot(x-p.x-t*dx,z-p.z-t*dz);
   if(d<distance){distance=d;driveHeight=p.y+(q.y-p.y)*t;}
  }
- const blend=(1-smooth((distance-2.5)/7.5))*smooth((offset-6)/6);
+ const blend=(1-smooth((distance-4)/7.5))*smooth((offset-6)/6);
  height+=(driveHeight-height)*blend;
  // A level forecourt joins the straight aisle and perpendicular parking bays.
  const apronDistance=Math.hypot(Math.max(-31-x,0,x+11),Math.max(-22-z,0,z-4));
@@ -48,7 +70,7 @@ export function terrainHeight(x,z){
 /** One continuous massif grows directly from the uphill road shoulder.
  * Shared by rendering and flight clearance; the paved corridor is unchanged. */
 export function mountainHeight(x,z){
- const a=Math.atan2(x,WORLD.centerZ-z),d=roadOffset(x,z)-6;
+ const a=Math.atan2(x,WORLD.centerZ-z),d=Math.hypot(x,z-WORLD.centerZ)-routeRadius(a)-6;
  if(d<=0)return -Infinity;
  const angle=wrap(a-.2),edge=1-smooth((Math.abs(angle)-.72)/.5);
  if(edge===0)return -Infinity;
@@ -56,8 +78,12 @@ export function mountainHeight(x,z){
  const flank=Math.exp(-Math.pow(angle/.68,2))*(.96+.04*Math.cos(angle*18));
  const ascent=Math.pow(Math.sin(Math.min(d/700,1)*Math.PI/2),1.12);
  const back=1-smooth((d-700)/900);
- return (routeHeight(a)+820*ascent*flank)*edge*back;
+ const massif=(routeHeight(a)+820*ascent*flank)*edge*back;
+ const portalBlend=smooth((a-(TUNNEL.startAngle-.06))/.06)*(1-smooth((a-TUNNEL.endAngle)/.06));
+ const cover=(routeHeight(a)+10*smooth(d/5)+Math.max(0,d-5)*.8)*portalBlend*(1-smooth((d-35)/25));
+ return Math.max(massif,cover);
 }
+export const waterfallHill=(x,z)=>62*Math.exp(-Math.pow(x/75,2)-Math.pow((z-1020)/80,2));
 export function fresh(){return {status:'ready',phase:'jeep',x:-16,y:terrainHeight(-16,-9),z:-9,heading:-.45,speed:0,pitch:0,roll:0,elapsed:0,cooldown:0,events:[],actionReady:false,takeoff:0,parked:false,arrived:false,...flightState(),...jeepState()}}
 export function begin(s,vehicle='jeep'){Object.assign(s,fresh(),{status:'running'});switchVehicle(s,vehicle);}
 export function togglePause(s){if(s.status==='running')s.status='paused';else if(s.status==='paused')s.status='running';}
@@ -134,11 +160,12 @@ function updateJeep(s,input,steer,dt){
  s.heading+=s.yawRate*dt;
  const nx=s.x+Math.sin(s.heading)*s.speed*dt,nz=s.z-Math.cos(s.heading)*s.speed*dt;
  const c=CABIN_BOUNDS,hitCabin=nx>c.minX&&nx<c.maxX&&nz>c.minZ&&nz<c.maxZ;
- const hitShore=lakeRadius(nx,nz)<1+4/LAKE.rz,hitBound=roadRadius(nx,nz)>1.14||nz<WORLD.northLimit;
+ const hitShore=lakeRadius(nx,nz)<1+4/LAKE.rz,hitBound=roadOffset(nx,nz)>78||(nz<WORLD.northLimit&&Math.abs(roadOffset(nx,nz))>78);
  const angle=Math.atan2(nx,WORLD.centerZ-nz),offset=Math.abs(roadOffset(nx,nz));
+ const hitBridge=Math.abs(wrap(angle-BRIDGE.angle))<BRIDGE.halfAngle&&offset>BRIDGE.halfWidth-1.35;
  const hitTunnel=angle>=TUNNEL.startAngle&&angle<=TUNNEL.endAngle&&offset>TUNNEL.innerHalfWidth-1.2&&offset<TUNNEL.outerHalfWidth+1.2;
- if(hitCabin||hitShore||hitBound||hitTunnel){
-  if(Math.abs(s.speed)>1.5)bump(s,hitTunnel?'Tunnel wall. Reverse and steer back to the center.':hitCabin?'Mind the cabin. Reverse to turn around.':hitShore?'Lake edge. Reverse back onto the road.':'The mountain pass ends here. Turn back toward the lake.');
+ if(hitCabin||hitShore||hitBound||hitTunnel||hitBridge){
+  if(Math.abs(s.speed)>1.5)bump(s,hitBridge?'Bridge railing. Reverse and steer toward the center.':hitTunnel?'Tunnel wall. Reverse and steer back to the center.':hitCabin?'Mind the cabin. Reverse to turn around.':hitShore?'Lake edge. Reverse back onto the road.':'The mountain pass ends here. Turn back toward the lake.');
   // Absorb impact rather than bouncing repeatedly between forward and reverse.
   s.speed=0;s.acceleration=0;s.yawRate=0;
  }else{s.x=nx;s.z=nz;}
@@ -148,7 +175,7 @@ function updateJeep(s,input,steer,dt){
 }
 function flightGroundHeight(x,z){
  const outer=roadRadius(x,z),rise=Math.max(0,outer-1.17);
- return Math.max(terrainHeight(x,z),mountainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
+ return Math.max(terrainHeight(x,z),mountainHeight(x,z),waterfallHill(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
 }
 function flightClearance(x,z){
  const angle=Math.atan2(x,WORLD.centerZ-z),offset=Math.abs(roadOffset(x,z));

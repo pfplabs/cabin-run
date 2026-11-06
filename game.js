@@ -9,6 +9,9 @@ import {RoadDust} from './road-dust.js';
 import {createSkyMaterial,daylightStateAt,applyDaylight} from './daylight-cycle.js';
 import {Water} from './vendor/Water.js';
 import * as E from './engine.js';
+import {SHORELINE_GLSL} from './shoreline.js';
+import {createWaterfallBridge} from './waterfall-bridge.js';
+import {createMinimap} from './minimap.js';
 import {applyHeroMaterials} from './hero-materials.js';
 import {createRoadSigns} from './road-signs.js';
 import {createForest} from './foliage.js';
@@ -51,12 +54,13 @@ const normals=surfaceMap('waternormals.jpg');
 const water=new Water(new THREE.PlaneGeometry(2600,2600),{textureWidth:innerWidth<700?512:1024,textureHeight:innerWidth<700?512:1024,waterNormals:normals,sunDirection,sunColor:0xfff4e1,waterColor:0x155d75,distortionScale:2.1,fog:true});water.rotation.x=-Math.PI/2;water.position.y=0;scene.add(water);
 // Softer sun sparkle and visible water-body colour avoid a polished-metal appearance.
 water.material.uniforms.size.value=3.5;
-water.material.fragmentShader=water.material.fragmentShader
+water.material.fragmentShader=SHORELINE_GLSL+water.material.fragmentShader
  .replace('100.0, 2.0, 0.5','90.0, 0.65, 0.35')
  .replace('vec3( 1.5, 1.0, 1.5 )','vec3( 1.0, 1.0, 1.0 )')
  .replace('float reflectance = rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 );','float reflectance = min(0.84, rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 ));')
  .replace('vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * waterColor;',`
-  float lakeRadius=length(vec2(worldPosition.x/${E.LAKE.rx.toFixed(1)},(worldPosition.z-${E.LAKE.z.toFixed(1)})/${E.LAKE.rz.toFixed(1)}));
+  vec2 shoreUV=vec2(worldPosition.x/${E.LAKE.rx.toFixed(1)},(worldPosition.z-${E.LAKE.z.toFixed(1)})/${E.LAKE.rz.toFixed(1)});
+  float lakeRadius=length(shoreUV)/lakeShoreScale(atan(shoreUV.x,-shoreUV.y));
   vec3 lakeTint=mix(waterColor,vec3(.035,.17,.19),smoothstep(.91,1.025,lakeRadius));
   vec3 scatter=(.55+.45*max(0.0,dot(surfaceNormal,eyeDirection)))*lakeTint;
   reflectionSample*=vec3(.92,.99,1.05);
@@ -85,11 +89,14 @@ for(const side of [-1,1]){const edge=roadPts.map((p,i)=>{const prev=roadPts[(i+6
 const centerLine=new THREE.Mesh(mergeGeometries(roadMarks),new THREE.MeshStandardMaterial({color:0xdedbd0,roughness:.9,side:THREE.DoubleSide}));centerLine.receiveShadow=true;scene.add(centerLine);roadMarks.forEach(g=>g.dispose());
 // Roadside posts make the finite drivable edge legible, not an invisible wall.
 const postG=new THREE.CylinderGeometry(.065,.08,1,5),postM=new THREE.MeshStandardMaterial({color:0xd7cbb0});const posts=new THREE.InstancedMesh(postG,postM,192);const dummy=new THREE.Object3D();
-for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),x=p.x+6.3*Math.sin(a),z=p.z-6.3*Math.cos(a);dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
+for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),q=E.roadPoint(a+.0001),length=Math.hypot(q.x-p.x,q.z-p.z),x=p.x+6.3*(q.z-p.z)/length,z=p.z-6.3*(q.x-p.x)/length;dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
 // Detailed needle cards and real trunks arranged around the mountain road.
 const forest=createForest(landHeight,E.roadRadius);scene.add(forest,createRoadSigns(landHeight));
 let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
 
+const scenicBridge=createWaterfallBridge();scene.add(scenicBridge);scenicBridge.updateMatrixWorld(true);scenicBridge.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
+const minimap=createMinimap();document.body.append(minimap.element);
+const scenicRoadKm=(E.roadLength()/1000).toFixed(2);
 const flightBarrier=createFlightBarrier(),waterWake=new WaterWake();scene.add(flightBarrier,createLandingCorridor(E.LANDING_CORRIDOR),waterWake);
 let jeep,plane,propeller,propellerBlur,flightSurfaces={},wheels=[],ready=false,visual=0,mode='chase',selectedVehicle='jeep',sound=false,audioCtx,osc,gain;
 const keys=new Set(),held=new Map(),frameTimes=[];let last=0,toastLife=0,updateClock=0;
@@ -124,8 +131,8 @@ function formatTime(t){return String(Math.floor(t/60)).padStart(2,'0')+':'+(t%60
 function sync(){
  const flying=state.phase==='plane',off=flying&&state.enginePhase==='off'&&!state.parked,starting=flying&&state.enginePhase==='starting';
  $('#vehicle').textContent=flying?'YELLOW FLOATPLANE':'4 × 4 JEEP';$('#time').textContent=formatTime(state.elapsed);$('#metric-label').textContent=flying?'ALTITUDE':'SPEED';$('#metric').innerHTML=flying?Math.round(state.y)+' <small>m</small>':Math.round(Math.abs(state.speed)*3.6)+' <small>km/h</small>';$('#drive').setAttribute('aria-pressed',String(!flying));$('#fly').setAttribute('aria-pressed',String(flying));$('#chapter').textContent=flying?'02 / ABOVE THE LAKE':'01 / THE MOUNTAIN ROAD';$('#objective').innerHTML=flying?'Find your<br>way home.':'Take the long<br>way home.';
- $('#instructions').textContent=!flying?'Follow the winding lakeside road over the ridge and through the tunnel. The paved side road leads to three marked cabin parking bays.':state.parked?'Moored with the engine off. Space releases the mooring, then Space starts the engine.':off?'Press Space to start the engine. After the three-second startup, hold Shift to add power and W to lift off.':starting?'Engine starting. Wait for steady idle before adding throttle.':state.onWater?'Shift adds power; Control brakes. At idle, hold B to push backward on water. W lifts off above 36 km/h. Space moors beside the dock.':state.landingStatus==='approach'?'Aligned with the buoy corridor. Control reduces engine power in the air; it is not a wheel brake. Use S to descend. The floats settle onto the water, then Control slows your taxi.':'Shift adds power; Control reduces it gradually in the air. W / S pitch, A / D bank. Approach the cabin between the two buoy lines, slow and descend to land.';
- $('#checklist').innerHTML=flying?'<div><span>↟</span> Airspeed <b>'+Math.round(state.speed*3.6)+' km/h</b></div><div><span>↗</span> Throttle <b>'+Math.round((state.throttle||0)*100)+'%</b></div><div><span>◉</span> Engine <b>'+(off?'OFF':starting?'STARTING':Math.round(state.propRPM||0)+' RPM')+'</b></div>':'<div><span>↟</span> Destination <b>North shore</b></div><div><span>↻</span> Scenic road <b>3.63 km</b></div>';
+ $('#instructions').textContent=!flying?'Follow the forest S-bends up the mountain, through the carved tunnel, and down to the waterfall bridge. The paved side road leads to three marked cabin parking bays.':state.parked?'Moored with the engine off. Space releases the mooring, then Space starts the engine.':off?'Press Space to start the engine. After the three-second startup, hold Shift to add power and W to lift off.':starting?'Engine starting. Wait for steady idle before adding throttle.':state.onWater?'Shift adds power; Control brakes. At idle, hold B to push backward on water. W lifts off above 36 km/h. Space moors beside the dock.':state.landingStatus==='approach'?'Aligned with the buoy corridor. Control reduces engine power in the air; it is not a wheel brake. Use S to descend. The floats settle onto the water, then Control slows your taxi.':'Shift adds power; Control reduces it gradually in the air. W / S pitch, A / D bank. Approach the cabin between the two buoy lines, slow and descend to land.';
+ $('#checklist').innerHTML=flying?'<div><span>↟</span> Airspeed <b>'+Math.round(state.speed*3.6)+' km/h</b></div><div><span>↗</span> Throttle <b>'+Math.round((state.throttle||0)*100)+'%</b></div><div><span>◉</span> Engine <b>'+(off?'OFF':starting?'STARTING':Math.round(state.propRPM||0)+' RPM')+'</b></div>':'<div><span>↟</span> Destination <b>North shore</b></div><div><span>↻</span> Scenic road <b>'+scenicRoadKm+' km</b></div>';
  $('#controls-copy').innerHTML=flying?'<b>W S</b> pitch <b>A D</b> bank <b>SHIFT</b> throttle up <b>CTRL</b> '+(state.onWater?'water brake · <b>B</b> push backward':'throttle down'):'<b>W S</b> throttle & reverse <b>A D</b> steer <b>SHIFT</b> accelerate';
  const canAct=state.actionReady||state.parked||off||starting;$('#interact').classList.toggle('hidden',!canAct);$('#interact').disabled=starting;
  const actionText=state.parked?'Release mooring':off?'Start engine':starting?'Starting engine · '+Math.ceil(state.engineStartRemaining)+'s':flying?'Moor at the dock':'Park by the cabin';$('#interact').innerHTML=actionText+' <span>SPACE</span>';$('#touch-action').textContent=state.parked?'UNMOOR':off?'START':starting?'STARTING':flying?'MOOR':'PARK';$('#touch-action').disabled=!canAct||starting;
@@ -159,7 +166,7 @@ function frame(t){if(last&&state.status==='running'){frameTimes.push(t-last);if(
   if(state.phase==='jeep'&&state.status==='running')for(const wheel of wheels){wheel.rotation.order='YXZ';wheel.rotation.x-=state.speed*dt/.588;if(wheel.name.includes('Front'))wheel.rotation.y=-(state.steeringAngle||0);}
  }
  roadDust.update(state,state.status==='running'?dt:0);waterWake.update(state,state.status==='running'?dt:0);
- water.material.uniforms.time.value+=dt*.55;
+ water.material.uniforms.time.value+=dt*.55;scenicBridge.update(visual);minimap.update(state);
  applyDaylight(daylightStateAt(visual),{skyMaterial:skyMat,sun,sunDirection,ambient,water,renderer,scene});
  if(ready&&visual-lastEnvironmentRefresh>20){refreshSkyEnvironment();lastEnvironmentRefresh=visual;}
  flightBarrier.visible=state.phase==='plane'&&state.status==='running'&&state.boundaryStatus!=='inside';flightBarrier.material.uniforms.strength.value=state.boundaryStatus==='warning'?.7:1;flightBarrier.material.uniforms.outside.value=state.boundaryStatus==='warning'?0:1;flightBarrier.material.uniforms.time.value=visual;

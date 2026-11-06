@@ -16,7 +16,7 @@ test('snow summit is the highest terrain, far above the tunnel',()=>{
  const peak=point(.2,706),height=landscapeHeight(peak.x,peak.z);
  assert.ok(height>880);assert.ok(height-roadPoint(.2).y>800);
  for(let a=-Math.PI;a<Math.PI;a+=.04)for(let d=7;d<1500;d+=20){const p=point(a,d);assert.ok(landscapeHeight(p.x,p.z)<=height+.001);}
- const g=createLandscapeGeometry();g.computeBoundingBox();assert.ok(g.boundingBox.max.y>870);assert.ok(g.index.count/3<180000);g.dispose();
+ const g=createLandscapeGeometry();g.computeBoundingBox();assert.ok(g.boundingBox.max.y>870);assert.ok(g.index.count/3<240000);g.dispose();
 });
 test('pavement and lake-facing tunnel apertures retain their previous ground',()=>{
  for(let a=-Math.PI;a<Math.PI;a+=.025)for(const d of [-11,-5.2,0,5.2]){
