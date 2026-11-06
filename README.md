@@ -1,5 +1,11 @@
 # Northbound — Cabin Run
 
+## Current 3D version
+
+This default branch preserves the original **2D prototype** described below. Current 3D gameplay, setup instructions and verification notes are on [`feat/3d-alpine-lake`](https://github.com/pfplabs/cabin-run/tree/feat/3d-alpine-lake) and its [README](https://github.com/pfplabs/cabin-run/blob/feat/3d-alpine-lake/README.md). The 3D work has not been merged into `main`.
+
+## Original 2D prototype
+
 A dependency-free browser minigame inspired by a lakeside Maya/OpenGL cabin scene from 2013. All artwork is drawn procedurally in Canvas. No external assets, network calls, backend, build tools or accounts are required.
 
 ## Play
