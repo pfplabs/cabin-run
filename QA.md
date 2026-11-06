@@ -1,5 +1,41 @@
 # Verification record
 
+## Combined Mac mini build — 2026-11-06
+
+Verified all four isolated checkouts were clean, then cherry-picked their exact
+completed commits onto `feat/3d-alpine-lake`, preserving the existing forest,
+meadow, glazing and road work:
+
+| Pass | Source commit | Integrated commit |
+| --- | --- | --- |
+| Vehicle hulls, spare wheel and paint | `0938d41` | `079fed8` |
+| Wind grass | `ffc4ec8` | `71a4477` |
+| Gravel | `4528f66` | `dd8073a` |
+| Lake water and shoreline shading | `f673689` | `9dbc5b0` |
+
+Also included `5e297c9`: extend the tunnel ridge's rear transition from 25 to
+150 metres, capping its crest and preserving paved/aperture samples. The new
+height regression checks a gradual rear slope and return to low foothills.
+
+All 127 tests passed. Source glTF inspection passed (60 meshes, 143,234 triangles,
+29 materials); runtime vehicle additions are tested separately. Shared game.js
+imports, factories, grass update/diagnostics and vehicle material ordering were
+reviewed after the clean automatic merges.
+
+Chrome at 1566×1169 / DPR 1 rendered the combined overview, Jeep and floatplane.
+Switching vehicles and starting the plane reached running/650 RPM on water.
+No console errors; existing shadow-map deprecation warning remains. Saved
+screenshots and raw diagnostics are in the task's sibling evidence directory.
+The playable tab is open at `http://127.0.0.1:4183/?build=9dbc5b0`.
+
+Short rolling samples: stationary Jeep 15.04 FPS / 80.1 ms p95 (170 frames),
+stationary plane 45.98 FPS / 30 ms p95 (240 frames). Multiple browser previews
+were open and the machine was shared; these are observations, not a controlled
+before/after comparison. A single-preview performance pass remains necessary.
+The combined build was not manually driven through the whole route; automated
+route, collision, tunnel, takeoff and landing checks passed. Original render
+attachments remain unavailable; visual equivalence is not claimed.
+
 ## Mac mini refinement check — 2026-11-06
 
 Follow-up forest/meadow pass: replaced branch-texture reuse on distant tree cards
