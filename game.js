@@ -7,9 +7,8 @@ import {createFlightBarrier,createPropellerBlur,createLandingCorridor,WaterWake}
 import {createRoadRibbonGeometry,createGravelMaterial,clipRibbonOutsideRoad} from './road-surfaces.js';
 import {RoadDust} from './road-dust.js';
 import {createSkyMaterial,daylightStateAt,applyDaylight} from './daylight-cycle.js';
-import {Water} from './vendor/Water.js';
+import {createLakeWater} from './lake-water.js';
 import * as E from './engine.js';
-import {SHORELINE_GLSL} from './shoreline.js';
 import {createWaterfallBridge} from './waterfall-bridge.js';
 import {createMinimap} from './minimap.js';
 import {applyHeroMaterials} from './hero-materials.js';
@@ -53,21 +52,7 @@ function surfaceMap(file,{color=false,repeat=[1,1],flipY=true}={}){
 
 // Live planar reflections and wave normals. No painted-background illusion.
 const normals=surfaceMap('waternormals.jpg');
-const water=new Water(new THREE.PlaneGeometry(2600,2600),{textureWidth:innerWidth<700?512:1024,textureHeight:innerWidth<700?512:1024,waterNormals:normals,sunDirection,sunColor:0xfff4e1,waterColor:0x155d75,distortionScale:2.1,fog:true});water.rotation.x=-Math.PI/2;water.position.y=0;scene.add(water);
-// Softer sun sparkle and visible water-body colour avoid a polished-metal appearance.
-water.material.uniforms.size.value=3.5;
-water.material.fragmentShader=SHORELINE_GLSL+water.material.fragmentShader
- .replace('100.0, 2.0, 0.5','90.0, 0.65, 0.35')
- .replace('vec3( 1.5, 1.0, 1.5 )','vec3( 1.0, 1.0, 1.0 )')
- .replace('float reflectance = rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 );','float reflectance = min(0.84, rf0 + ( 1.0 - rf0 ) * pow( ( 1.0 - theta ), 5.0 ));')
- .replace('vec3 scatter = max( 0.0, dot( surfaceNormal, eyeDirection ) ) * waterColor;',`
-  vec2 shoreUV=vec2(worldPosition.x/${E.LAKE.rx.toFixed(1)},(worldPosition.z-${E.LAKE.z.toFixed(1)})/${E.LAKE.rz.toFixed(1)});
-  float lakeRadius=length(shoreUV)/lakeShoreScale(atan(shoreUV.x,-shoreUV.y));
-  vec3 lakeTint=mix(waterColor,vec3(.035,.17,.19),smoothstep(.91,1.025,lakeRadius));
-  vec3 scatter=(.55+.45*max(0.0,dot(surfaceNormal,eyeDirection)))*lakeTint;
-  reflectionSample*=vec3(.92,.99,1.05);
- `);
-
+const water=createLakeWater({normals,sunDirection,lake:E.LAKE,quality:innerWidth<700?'low':'high'});scene.add(water);
 
 // Lake terrain, paved scenic road and distant mountain basin are generated meshes.
 const landHeight=landscapeHeight;
