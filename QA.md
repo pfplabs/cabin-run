@@ -1,0 +1,127 @@
+# Verification record
+
+## Combined Mac mini build — 2026-11-06
+
+Verified all four isolated checkouts were clean, then cherry-picked their exact
+completed commits onto `feat/3d-alpine-lake`, preserving the existing forest,
+meadow, glazing and road work:
+
+| Pass | Source commit | Integrated commit |
+| --- | --- | --- |
+| Vehicle hulls, spare wheel and paint | `0938d41` | `079fed8` |
+| Wind grass | `ffc4ec8` | `71a4477` |
+| Gravel | `4528f66` | `dd8073a` |
+| Lake water and shoreline shading | `f673689` | `9dbc5b0` |
+
+Also included `5e297c9`: extend the tunnel ridge's rear transition from 25 to
+150 metres, capping its crest and preserving paved/aperture samples. The new
+height regression checks a gradual rear slope and return to low foothills.
+
+All 127 tests passed. Source glTF inspection passed (60 meshes, 143,234 triangles,
+29 materials); runtime vehicle additions are tested separately. Shared game.js
+imports, factories, grass update/diagnostics and vehicle material ordering were
+reviewed after the clean automatic merges.
+
+Chrome at 1566×1169 / DPR 1 rendered the combined overview, Jeep and floatplane.
+Switching vehicles and starting the plane reached running/650 RPM on water.
+No console errors; existing shadow-map deprecation warning remains. Saved
+screenshots and raw diagnostics are in the task's sibling evidence directory.
+The playable tab is open at `http://127.0.0.1:4183/?build=9dbc5b0`.
+
+Short rolling samples: stationary Jeep 15.04 FPS / 80.1 ms p95 (170 frames),
+stationary plane 45.98 FPS / 30 ms p95 (240 frames). Multiple browser previews
+were open and the machine was shared; these are observations, not a controlled
+before/after comparison. A single-preview performance pass remains necessary.
+The combined build was not manually driven through the whole route; automated
+route, collision, tunnel, takeoff and landing checks passed. Original render
+attachments remain unavailable; visual equivalence is not claimed.
+
+## Mac mini refinement check — 2026-11-06
+
+Follow-up forest/meadow pass: replaced branch-texture reuse on distant tree cards
+with an independently seeded 512×1024 whole-crown spruce texture, preserving tree
+placement RNG, geometry, chunking and LOD. Broader meadow colour and dry-soil
+variation reuse the packed terrain sampler (one additional lookup). 119 tests
+passed after the final changes. Chrome compiled and rendered the scene without
+console errors; gameplay screenshot saved as `evidence/forest-meadow-gameplay.jpg`
+outside the repository. Browser camera/viewport changed concurrently during the
+review, so no controlled FPS comparison is claimed. No road/terrain geometry or
+collision changes were made in this follow-up.
+
+- Isolated checkout based on `8bf7e14`, served on `http://127.0.0.1:4183/?qa=1`.
+- 119 tests passed, including tunnel volume/camera clearance, watertight rock shells, three lake apertures, flat cabin terrain, and a new glass-only shadow regression. glTF inspection passed: 60 meshes, 143,234 triangles, 29 materials.
+- Chrome loaded the revised scene, started gameplay and switched cameras. No console errors were recorded. Existing `PCFSoftShadowMap` deprecation warning remains.
+- Ridge variation changes existing vertex heights only; no extra triangles, materials, lights or draw submissions. Cabin-only glass uses a clearer single-sided physical material; glass-only meshes no longer cast opaque shadow-map silhouettes. Mixed-material meshes retain shadows.
+- Actual browser screenshots were saved outside the repository in the task's `evidence` directory. Original reference attachments were not available in this checkout. This is a limited visual refinement, not a claim of photorealistic parity or measured FPS. The separate preview task owns performance measurement.
+
+## Current automated checks
+
+- `npm test`: 83 tests passed against the integrated source.
+- `node scripts/inspect-scene.mjs`: actual glTF parsing, 60 mesh primitives, 143,234 triangles, 29 materials; named vehicle, wheel, propeller and five aircraft control pivots preserved. All vertices finite.
+- Syntax checks pass for application, simulation, camera, environment, LOD, daylight, particle and recording modules.
+- Blender source reopens and exports. Human-scale cabin doors/stairs, aircraft hinge axes and extended-pier clearances were measured in the real geometry.
+- All five aircraft control surfaces passed fixed-skin intersection checks at −20°, −15°, 0°, 15° and 20°.
+
+Simulation tests include keyboard driving through the complete winding road and tunnel, the driveway/parking approach, 22/28 m/s speed limits, smooth braking/reverse, and equal scripted results at 30/60/120 FPS. Plane tests cover three-second startup, throttle lockout, taxi, takeoff, aligned approach, physical touchdown, water braking and explicit mooring without position teleportation. Pause/reset and boundary return/recovery are covered.
+
+Geometry tests raycast the actual land and driveway, check trimmed asphalt junctions, maintain a clear 10.4 m-wide tunnel envelope and camera sight lines, and prove that all three tunnel apertures are real openings with solid reveals and clear views toward lake water. Ground, dock, cabin, shore margins and flight clearances use the larger world's current coordinates.
+
+The dock berth is at X−23.7/Z30 with aircraft root Y0.10. At both parallel headings, the model has 0.67 m wing-to-pier vertical clearance and 0.85 m pontoon-to-fender horizontal clearance, with 0.06 m pontoon immersion. Taxi collision prevents entering the pier footprint.
+
+Forest tests preserve all 9,500 seeded locations, validate detailed/card fades, distance culling and reflection-safe visibility. Terrain tiles preserve all original triangles and share vertex buffers. Daylight tests cover cycle continuity, minimum brightness, sun elevation and matching sky/water/light state. These CPU tests do not prove GPU shader compilation or frame rate.
+
+## What was played previously
+
+Earlier revisions were rendered and played in a real Mac browser. Jeep/plane controls, pause, switching, reflections and boundary behavior were observed. User feedback drove this revision's camera, handling, road, tunnel, dock, world-size and lighting changes. That earlier play does not verify the latest integrated revision.
+
+## Fresh browser pass required
+
+The cloud browser disables WebGL. No current gameplay video, photorealistic parity or measured FPS is claimed here.
+
+Run `python3 -m http.server 4173`, then open `http://localhost:4173/?qa=1`:
+
+1. Confirm all assets load and no shader/console errors occur. Inspect `cabinDiagnostics()`.
+2. Drive the road at normal/boost speeds, brake, reverse and use both lanes through both tunnel portals. Look through all three openings. Confirm no boulder intrusion, camera clipping or road/land overlap.
+3. Follow the paved cabin branch. Check the matching asphalt junction, gravel shoulders, dust, parking apron and enlarged cabin.
+4. Switch to the plane. Space starts the engine; wait for idle. Shift adds power, W lifts, A/D banks, S descends. Inspect RPM-linked blades/blur and actual hinged surfaces.
+5. Fly the buoy corridor, reduce power, descend to a real water touchdown, then hold Control to slow. Inspect spray/wake. Taxi beside the longer pier and moor below 11 km/h. Unmoor, restart and take off again.
+6. Test the visible world boundary, manual return countdown and gradual recovery. Check clear ground/roof/pier separation.
+7. Test steering-follow orbit, drag, trackpad horizontal/diagonal swipe, pinch, ordinary wheel and Shift+scroll fallback. Repeat pause/resume mid-drag, vehicle switches and focus loss. Test physical touch separately.
+8. Inspect the natural sky and terrain. The photographed city skyline must be absent. Observe daylight/golden-hour changes, matching water highlights/reflections and no dark-night interval.
+9. Drive/fly for at least 30–60 seconds and sample `cabinDiagnostics()`. It reports average browser frame rate and p95 frame interval, renderer counts, forest submission estimates and terrain tile count. Check visible LOD transitions and reflection continuity. Record actual device, window size and pixel ratio when comparing performance.
+10. Capture current browser screenshots for visual review. Make the final trailer only after the user is satisfied. Never substitute Blender previews or generated frames for gameplay.
+
+## Known scope boundaries
+
+This is a compact, forgiving exploration game, not a full vehicle/flight simulator. The V key is a scene selector. Cockpit views are deferred until after visual work. Current artwork remains an iteration toward the reference, not a claim of photographic equivalence. The final trailer and retrospective article have not been produced or published.
+
+## Isolated river/cascade pass — 2026-11-06
+
+Base: `38a7856`, branch `feat/river-cascade-realism`. Integrate by cherry-picking
+this commit into the cabin feature checkout. Changes are restricted to the bridge
+water factory, new `river-water.js`, and regression tests. No lake material,
+terrain carving, gameplay or renderer-quality files changed.
+
+The river uses a lit standard material, variable width within the existing gorge,
+exact stations at the cascade bed breaks, distance-based longitudinal UVs,
+localized impact foam, accelerated falling flow, and 64 instanced droplets.
+Bank boulders sit closer to the channel. Lake-mouth alpha fades over 12 metres.
+Animation updates one shared time uniform; no CPU vertex/instance uploads,
+texture loads, render targets or extra reflection passes.
+
+Validation: all 129 tests pass, including road/bridge clearance, bed continuity,
+width bounds and stable geometry/instance arrays across 600 updates. Entire
+bridge/water group is five mesh draws and 13,124 triangles before shadow passes
+or lake reflection. This is a geometry budget, not a measured frame-time result.
+`git diff --check` passes. An isolated 1200×800 headless Chrome preview rendered
+the shader and spray with synthetic gorge terrain; `../evidence/river-shader-preview.png`
+records the initial shader version before the final reduction in waterfall contrast.
+The final frame-timing capture did not return usable measurements and was stopped.
+No FPS improvement is claimed. Final in-game daylight, lake-mouth blend, animated
+visual inspection, and full-frame GPU/cadence measurements remain integration QA.
+The existing interactive cabin browser tabs were not changed.
+
+Reproducible isolated preview: serve this checkout and open
+`artifacts/river-preview.html` (included in this commit). It stops after 240 frames
+and displays cadence statistics after 220; its synthetic terrain is for shader
+inspection, not a replacement for testing the full cabin scene.

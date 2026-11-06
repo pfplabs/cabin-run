@@ -1,0 +1,19 @@
+{
+  "name": "northbound-cabin-run-3d",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "python3 -m http.server 4173",
+    "test": "node --test tests/*.test.js",
+    "build:scene": "blender --background --python scripts/build_scene.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "three": "^0.183.2"
+  },
+  "private": true
+}

@@ -1,47 +1,199 @@
-(()=>{'use strict';
-const E=window.CabinEngine,canvas=document.querySelector('#game'),ctx=canvas.getContext('2d'),$=s=>document.querySelector(s);
-const state=E.fresh(),keys=new Set(),held=new Map();let last=0,visual=0,toastTime=0,audio=null,sound=false,best=Infinity,particles=[];
-try{const n=Number(localStorage.getItem('northbound-best-v1'));if(n>0)best=n}catch{};
-const fmt=t=>{const m=Math.floor(t/60),s=(t%60).toFixed(1).padStart(4,'0');return `${String(m).padStart(2,'0')}:${s}`};
-if(Number.isFinite(best))$('#best').textContent=fmt(best);
-const paths=[[710,458,837,450,852,548],[710,458,803,371,817,154],[710,458,540,432,452,431],[540,432,542,270],[542,270,620,215,817,154]];
-let seed=73;function rand(){seed=(seed*16807)%2147483647;return(seed-1)/2147483646}
-const trees=[];for(let i=0;i<150;i++){let x=405+rand()*590,y=35+rand()*650;if(x>600&&x<780&&y>300&&y<465)continue;if(E.CRATES.some(c=>Math.hypot(c.x-x,c.y-y)<52))continue;if(paths.some(p=>{for(let j=0;j<p.length-2;j+=2){let ax=p[j],ay=p[j+1],bx=p[j+2],by=p[j+3],t=E.clamp(((x-ax)*(bx-ax)+(y-ay)*(by-ay))/((bx-ax)**2+(by-ay)**2),0,1);if(Math.hypot(x-ax-(bx-ax)*t,y-ay-(by-ay)*t)<32)return true}return false}))continue;trees.push({x,y,size:18+rand()*21,tone:rand()})}
-const grasses=Array.from({length:250},()=>({x:rand()*1000,y:rand()*700,r:rand()}));
-function poly(points,fill,stroke,line=1){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=line;ctx.stroke()}}
-function rounded(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke()}}
-function label(text,x,y,color='#f0edc4',size=9){ctx.fillStyle=color;ctx.font=`600 ${size}px Arial`;ctx.textAlign='center';ctx.fillText(text,x,y)}
-function line(points,color,width,dash=[]){ctx.beginPath();for(let i=0;i<points.length;i+=2)i?ctx.lineTo(points[i],points[i+1]):ctx.moveTo(points[i],points[i+1]);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash(dash);ctx.stroke();ctx.setLineDash([])}
-function tree(t){const{x,y,size:s}=t;ctx.globalAlpha=.15;ctx.fillStyle='#0d1d18';ctx.beginPath();ctx.ellipse(x+12,y+7,s*.5,s*.26,-.3,0,7);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle='#695a37';ctx.fillRect(x-2,y-6,4,12);poly([[x,y-s],[x-s*.52,y-2],[x+s*.52,y-2]],t.tone>.5?'#345c3d':'#2b533b');poly([[x,y-s*1.1],[x-s*.38,y-s*.28],[x+s*.38,y-s*.28]],'#3d6945');poly([[x,y-s*1.22],[x-s*.23,y-s*.61],[x+s*.23,y-s*.61]],'#558056')}
-function drawCabin(){ctx.save();ctx.translate(681,368);ctx.fillStyle='#142c2440';ctx.fillRect(-65,5,155,65);rounded(-68,-36,136,82,3,'#785037');for(let y=-31;y<42;y+=8)line([-66,y,67,y],'#966442',3);rounded(-74,27,148,33,2,'#9a744d');for(let x=-70;x<74;x+=9)line([x,28,x,59],'#654c32',1);line([-74,58,74,58],'#c5a573',4);for(let x=-70;x<75;x+=19)line([x,47,x,62],'#c5a573',3);rounded(-50,-6,30,24,1,'#153d3a','#bb955b');line([-35,-6,-35,18],'#cba879',2);line([-50,7,-20,7],'#cba879',2);rounded(23,-6,30,24,1,'#193e38','#bb955b');line([38,-6,38,18],'#cba879',2);rounded(-9,0,21,36,1,'#bd9255');poly([[-84,-29],[0,-67],[84,-29],[75,-17],[0,-49],[-75,-17]],'#352e24');poly([[-75,-20],[0,-51],[75,-20],[75,-12],[0,-42],[-75,-12]],'#b08b59');poly([[-52,-41],[-52,-68],[-40,-68],[-40,-37]],'#67665a');ctx.fillStyle='#d8c9a3';ctx.fillRect(-54,-72,16,5);ctx.restore();line([782,367,782,300],'#d8d8b2',3);poly([[784,300],[817,308],[784,317]],'#254972');ctx.fillStyle='#e4e4ce';ctx.fillRect(792,302,5,13);poly([[784,306],[817,312],[817,316],[784,310]],'#e4e4ce');ctx.fillStyle='#b74435';ctx.fillRect(793,302,3,13);poly([[784,307],[817,313],[817,315],[784,309]],'#b74435')}
-function drawPlane(x,y,a,active){ctx.save();ctx.translate(x+10,y+15);ctx.rotate(a);ctx.fillStyle='#0b262545';ctx.beginPath();ctx.ellipse(0,0,29,17,0,0,7);ctx.fill();ctx.restore();ctx.save();ctx.translate(x,y);ctx.rotate(a);rounded(-22,-18,39,7,3,'#b6c8ba','#607675');rounded(-22,11,39,7,3,'#b6c8ba','#607675');line([-9,-12,-9,12],'#8f9b89',3);poly([[-9,-8],[-17,-38],[0,-38],[9,-8],[9,8],[0,38],[-17,38],[-9,8]],'#d6a62d','#6e672e');poly([[-25,-4],[-31,-17],[-21,-17],[-12,-5],[-12,5],[-21,17],[-31,17],[-25,4]],'#e9bc3f','#6e672e');rounded(-29,-7,58,14,7,'#edc94c','#8c752e');rounded(4,-6,12,12,3,'#355454');line([-22,0,4,0],'#b34e2b',3);line([31,-(active?16:11),31,active?16:11],'#e4e5b9',2);if(active){ctx.globalAlpha=.25;ctx.fillStyle='#fafbd0';ctx.beginPath();ctx.ellipse(31,0,3,20,0,0,7);ctx.fill()}ctx.restore()}
-function drawJeep(x,y,a){ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.fillStyle='#0e211d55';ctx.fillRect(-15,-10,38,24);for(const z of [-1,1]){rounded(-12,z*12-4,11,8,2,'#182823');rounded(9,z*12-4,11,8,2,'#182823')}rounded(-17,-12,38,24,4,'#b9bb91','#374635');rounded(-7,-10,20,20,2,'#495c4a');rounded(6,-9,6,18,1,'#b1c2aa');rounded(-14,-8,7,16,1,'#526a53');ctx.fillStyle='#f3e6a4';ctx.fillRect(19,-10,3,5);ctx.fillRect(19,5,3,5);rounded(-22,-6,6,12,2,'#1e332a');ctx.restore()}
-function drawWorld(){ctx.clearRect(0,0,1000,700);const water=ctx.createLinearGradient(0,0,400,700);water.addColorStop(0,'#2c676a');water.addColorStop(1,'#184d57');ctx.fillStyle=water;ctx.fillRect(0,0,1000,700);for(let y=10;y<700;y+=24){for(let x=0;x<405;x+=57){const drift=Math.sin(visual*.55+y*.03+x*.02)*7;line([x+drift,y,x+24+drift,y],'#91c2bb16',1.2)}}const land=[];for(let y=0;y<=720;y+=10)land.push([E.shore(y),y]);poly([...land,[1000,720],[1000,0]],'#829865');line(land.flat(),'#bdc395',12);line(land.map(([x,y])=>[x-7,y]).flat(),'#b9c7a342',5);for(const g of grasses){if(g.x>E.shore(g.y)+20){ctx.fillStyle=g.r>.6?'#c1c99329':'#2c61301a';ctx.beginPath();ctx.ellipse(g.x,g.y,5+g.r*15,2+g.r*5,0,0,7);ctx.fill()}}
-for(const p of paths){line(p,'#6d7e513a',38);line(p,'#b0ae7e',24);line(p,'#c3bd8b77',2,[3,8])}
-// Small mountain stream and footbridge.
-line([998,487,929,460,904,490,835,490,793,508,759,515,716,541,650,566,598,574,548,563,483,584,389,579],'#d1c494',18);line([998,487,929,460,904,490,835,490,793,508,759,515,716,541,650,566,598,574,548,563,483,584,389,579],'#548f91',12);line([998,487,929,460,904,490,835,490,793,508,759,515,716,541,650,566,598,574,548,563,483,584,389,579],'#bfdbcb99',2,[8,7]);rounded(829,472,40,38,2,'#846a41');for(let y=476;y<508;y+=6)line([830,y,868,y],'#b99a64',2);line([829,473,829,509],'#d1b886',3);line([868,473,868,509],'#d1b886',3);
-// Dock, canoe and parked floatplane.
-rounded(332,412,125,37,2,'#8a704c');for(let x=338;x<451;x+=9)line([x,414,x,447],'#b8a075',2);line([334,413,454,413],'#ccb88b',3);for(let x=334;x<458;x+=40){ctx.fillStyle='#5c5039';ctx.fillRect(x,407,4,48)}ctx.save();ctx.translate(357,480);ctx.rotate(.1);poly([[-39,0],[-22,-7],[25,-6],[40,0],[24,7],[-24,7]],'#a9824b','#e0be7b',2);line([-25,0,26,0],'#d3b682',2);ctx.restore();label('FLOATPLANE DOCK',452,477,'#213f35',8);
-E.ROCKS.forEach(r=>{poly([[r.x-r.r,r.y+2],[r.x-r.r*.6,r.y-r.r*.6],[r.x+r.r*.2,r.y-r.r],[r.x+r.r,r.y-r.r*.3],[r.x+r.r*.8,r.y+r.r*.5],[r.x-r.r*.6,r.y+r.r*.5]],'#7b8e81','#667b70');poly([[r.x-r.r*.6,r.y-r.r*.6],[r.x+r.r*.2,r.y-r.r],[r.x+r.r*.5,r.y],[r.x-r.r*.7,r.y+2]],'#a9b3a0')});
-trees.filter(t=>t.y<320).forEach(tree);drawCabin();trees.filter(t=>t.y>=320).forEach(tree);
-E.CRATES.forEach((c,i)=>{if(state.collected[i])return;const p=2+Math.sin(visual*3+i)*2;ctx.strokeStyle='#e5f78a88';ctx.lineWidth=2;ctx.beginPath();ctx.arc(c.x,c.y,26+p,0,7);ctx.stroke();rounded(c.x-11,c.y-11,22,22,2,'#e3c679','#6a683a');line([c.x-9,c.y-9,c.x+9,c.y+9],'#988453',2);line([c.x+9,c.y-9,c.x-9,c.y+9],'#988453',2);label('0'+(i+1),c.x,c.y-35,'#f0f6c7',10)});
-if(state.phase==='jeep'){drawPlane(360,377,Math.PI,false);if(state.collected.every(Boolean)){ctx.strokeStyle='#e2f588';ctx.lineWidth=3;ctx.setLineDash([5,5]);ctx.beginPath();ctx.arc(E.DOCK.x,E.DOCK.y,49,0,7);ctx.stroke();ctx.setLineDash([])}drawJeep(state.x,state.y,state.angle)}else{drawJeep(452,431,-.2);for(let i=state.ring;i<E.RINGS.length;i++){const r=E.RINGS[i],active=i===state.ring;ctx.strokeStyle=active?'#f4ef9c':'#f4ef9c33';ctx.lineWidth=active?5:2;ctx.beginPath();ctx.arc(r.x,r.y,38+(active?Math.sin(visual*3)*3:0),0,7);ctx.stroke();label(String(i+1),r.x,r.y+5,active?'#fff7b9':'#e6e9ba66',15);if(active){line([r.x-7,r.y-55,r.x,r.y-46,r.x+7,r.y-55],'#fff1a7',3)}}if(state.ring===5){ctx.strokeStyle='#eaf69e';ctx.lineWidth=4;ctx.beginPath();ctx.arc(E.DOCK.x,E.DOCK.y,65,0,7);ctx.stroke();label('LAND HERE',E.DOCK.x,E.DOCK.y-80,'#fffbc3',11)}drawPlane(state.x,state.y,state.angle,true)}
-for(const p of particles){ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4)}ctx.globalAlpha=1;
-// Warm vignette and a quiet compass.
-const v=ctx.createRadialGradient(520,330,170,500,350,670);v.addColorStop(0,'#fae09b00');v.addColorStop(1,'#072f3355');ctx.fillStyle=v;ctx.fillRect(0,0,1000,700);ctx.strokeStyle='#e4e3b366';ctx.lineWidth=1;ctx.beginPath();ctx.arc(947,634,18,0,7);ctx.stroke();poly([[947,618],[941,638],[947,634],[953,638]],'#e4e3b3');label('N',947,609,'#e4e3b3',8)
+import {createExplorationScenery,explorationSigns} from './exploration-scenery.js';
+import {EngineExhaust} from './engine-exhaust.js';
+import * as THREE from 'three';
+import {createFrameMetrics} from './frame-metrics.js';
+import {createRenderQuality,isSettingsInput,isPauseShortcut} from './render-quality.js?v=pause-focus-1';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {CockpitCamera} from './cockpit-camera.js?v=pickup-glass-1';
+import {CameraRig} from './camera-rig.js';
+import {CameraObstruction} from './camera-collision.js';
+import {createTerrainMaterial,createRockMaterial} from './landscape-materials.js';
+import {createFlightBarrier,createPropellerBlur,createLandingCorridor,WaterWake} from './flight-effects.js';
+import {createRoadRibbonGeometry,createGravelMaterial,clipRibbonOutsideRoad,createCabinApproachGeometry,cabinTurnoffOpening} from './road-surfaces.js';
+import {RoadDust} from './road-dust.js';
+import {createSkyMaterial,daylightStateAt,applyDaylight} from './daylight-cycle.js';
+import {createLakeWater} from './lake-water.js';
+import * as E from './engine.js';
+import {createWaterfallBridge} from './waterfall-bridge.js';
+import {createMinimap} from './minimap.js';
+import {applyHeroMaterials} from './hero-materials.js';
+import {applyVehicleFidelity} from './vehicle-fidelity.js';
+import {applyJeepBody} from './jeep-body.js?v=cockpit-anchor-1';
+import {applyPlaneBody} from './plane-body.js';
+import {createRoadSigns} from './road-signs.js';
+import {createForest} from './foliage.js';
+import {createForestGrass} from './forest-grass.js';
+import {createCabinGrounding} from './cabin-grounding.js';
+import {landscapeHeight,createLandscapeGeometry,createLandscapeTiles,createAsphaltMaps,createLakeDetails,createSandbar,createMountainTunnel,createParkingLot} from './environment.js';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+
+const $=q=>document.querySelector(q),canvas=$('#scene'),state=E.fresh();
+document.body.classList.add('intro-open');
+let renderer;
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance',preserveDrawingBuffer:false});}
+catch(err){$('#fatal').classList.remove('hidden');$('#fatal').textContent='This scene needs WebGL 2. Please enable hardware acceleration or open it in a current Chrome, Safari, Firefox or Edge browser.';throw err;}
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const frameMetrics=createFrameMetrics(renderer);let benchmarkView=null;
+const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x9fbac5,.00065);
+const camera=new THREE.PerspectiveCamera(49,innerWidth/innerHeight,.2,6000);
+camera.position.set(-49,24,55);camera.lookAt(0,4,-7);
+const cameraObstacles=[],cameraObstruction=new CameraObstruction({heightAt:landscapeHeight,obstacles:cameraObstacles});
+const cameraRig=new CameraRig(camera,canvas,{heightAt:landscapeHeight,resolveCamera:options=>cameraObstruction.resolve(options)});cameraRig.setMode('cabin',state);
+const ambient=new THREE.HemisphereLight(0xd6e4ec,0x44433b,.9);scene.add(ambient);
+const sunDirection=new THREE.Vector3(-.6,.48,.55).normalize();
+const sun=new THREE.DirectionalLight(0xffebd4,3.1);sun.position.copy(sunDirection).multiplyScalar(110);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-100;sun.shadow.camera.right=100;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;sun.shadow.camera.near=1;sun.shadow.camera.far=300;sun.shadow.bias=-.00025;sun.shadow.normalBias=.035;scene.add(sun,sun.target);
+
+// The horizon is the actual valley terrain under a building-free moving sky.
+const skyMat=createSkyMaterial(),skyGeometry=new THREE.SphereGeometry(1000,32,16);
+const sky=new THREE.Mesh(skyGeometry,skyMat);sky.frustumCulled=false;scene.add(sky);scene.background=null;
+const environmentScene=new THREE.Scene(),environmentSky=new THREE.Mesh(skyGeometry,skyMat);environmentSky.frustumCulled=false;environmentScene.add(environmentSky);
+const pmrem=new THREE.PMREMGenerator(renderer);let environmentTarget=null,lastEnvironmentRefresh=-Infinity;const environmentMetrics={refreshes:0,lastCPUGenerationMs:null};
+function refreshSkyEnvironment(){const started=performance.now();const next=pmrem.fromScene(environmentScene,.025,.1,6000);scene.environment=next.texture;environmentTarget?.dispose();environmentTarget=next;environmentMetrics.refreshes++;environmentMetrics.lastCPUGenerationMs=performance.now()-started;}
+const textureLoader=new THREE.TextureLoader();
+function surfaceMap(file,{color=false,repeat=[1,1],flipY=true}={}){
+ const t=textureLoader.load('./assets/pbr/'+file);t.wrapS=t.wrapT=THREE.RepeatWrapping;
+ t.repeat.set(...repeat);t.flipY=flipY;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+ if(color)t.colorSpace=THREE.SRGBColorSpace;return t;
 }
-function beep(f,d=.13){if(!sound)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();audio.resume();const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+d)}catch{}}
-function toast(text){$('#toast').textContent=text;$('#toast').classList.add('visible');toastTime=3}
-function clearInput(){keys.clear();held.clear();document.querySelectorAll('[data-key]').forEach(b=>b.classList.remove('pressed'))}
-function start(){E.begin(state);particles=[];clearInput();$('#overlay').classList.add('hidden');$('#pause').disabled=false;$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');$('#steps').classList.remove('hidden');canvas.focus();sync()}
-function pause(){if(!['running','paused'].includes(state.status))return;E.pause(state);clearInput();if(state.status==='paused'){showModal('A moment<br><em>by the lake.</em>','Your run is paused. Take your time.','Continue adventure');$('#pause').textContent='▶';$('#pause').setAttribute('aria-label','Resume game')}else{$('#overlay').classList.add('hidden');$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus()}}
-function showModal(title,text,button){$('#modal-title').innerHTML=title;$('#modal-text').textContent=text;$('#start').innerHTML=button+' <span>↗</span>';$('#steps').classList.add('hidden');$('#overlay').classList.remove('hidden')}
-function win(){const total=state.elapsed+state.penalty,record=total<best;if(record){best=total;try{localStorage.setItem('northbound-best-v1',String(best))}catch{}$('#best').textContent=fmt(best)}$('#pause').disabled=true;showModal('Home before<br><em>the stars.</em>',`Run complete in ${fmt(total)}${state.penalty?' (including '+state.penalty+'s in bumps)':''}. ${record?'A new personal best. ':''}${total<65?'Bush pilot gold. Beautiful flying.':'Supplies delivered. A good day on the lake.'}`,'Take another run');for(let i=0;i<65;i++)particles.push({x:state.x,y:state.y,vx:(rand()-.5)*200,vy:(rand()-.5)*200,life:2,color:i%2?'#f4e490':'#f9f9c5'});beep(880,.5);clearInput()}
-function sync(){const plane=state.phase==='plane';$('#time').textContent=fmt(state.elapsed+state.penalty);$('#progress-label').textContent=plane?'MARKERS':'SUPPLIES';$('#progress').textContent=plane?`${state.ring} / 5`:`${state.collected.filter(Boolean).length} / 3`;$('#vehicle').textContent=plane?'● FLOATPLANE':'● JEEP';$('#touch-vehicle').textContent=plane?'FLIGHT CONTROLS':'JEEP CONTROLS';$('#touch-help').textContent=plane?'← → steer · ↑ ↓ throttle':'Hold a direction to drive';$('#control-copy').innerHTML=plane?'Left / right to steer.<br>Up to boost. Down to slow.':'Drive in any direction.<br>Release to slow down.';$('#action').classList.toggle('hidden',!state.actionReady||state.status!=='running');$('#action').innerHTML=(plane?'Land at the dock':'Load the floatplane')+' <span>E / SPACE</span>';$('#touch-action').disabled=!state.actionReady||state.status!=='running';$('#touch-action').textContent=plane?'LAND / E':'LOAD / E';
-if(plane){$('#objective').textContent=state.status==='won'?'Delivery complete':state.ring===5?'Bring it home':'Fly the lake';$('#objective-copy').textContent=state.status==='won'?'All supplies delivered. The cabin is ready for the night.':state.ring===5?'Circle back to the highlighted dock. Press E or tap Land when you are close.':'Steer through the five numbered markers in order. The bright ring is your next target.';$('#checklist').innerHTML='<li><span>01</span> Supplies loaded <b>✓</b></li><li><span>02</span> Lake markers <b>'+state.ring+'/5</b></li><li><span>03</span> Return to the dock <b>'+(state.status==='won'?'✓':'○')+'</b></li>'}else{$('#objective').textContent=state.collected.every(Boolean)?'Ready for takeoff':'Stock the cabin';$('#objective-copy').textContent=state.collected.every(Boolean)?'Drive to the highlighted dock on the left. Press E or tap Load to take off.':'Follow the dotted trail and collect the three glowing supply crates.';$('#checklist').innerHTML=E.CRATES.map((c,i)=>`<li class="${state.collected[i]?'done':''}"><span>0${i+1}</span> ${c.label} <b>${state.collected[i]?'✓':'○'}</b></li>`).join('')}
+
+// Live planar reflections and wave normals. No painted-background illusion.
+const normals=surfaceMap('waternormals.jpg');
+const water=createLakeWater({normals,sunDirection,lake:E.LAKE,quality:innerWidth<700?'low':'high'});scene.add(water);
+const reflectWater=water.onBeforeRender;let reflectionProbe=true;water.onBeforeRender=function(...args){if(reflectionProbe)reflectWater.apply(this,args);};
+
+// Lake terrain, paved scenic road and distant mountain basin are generated meshes.
+const landHeight=landscapeHeight;
+const grass=surfaceMap('grasslight-big.jpg',{color:true,repeat:[180,180]});
+const groundGeo=createLandscapeGeometry();
+const terrainMaterial=createTerrainMaterial({grassMap:grass,lake:E.LAKE});
+const ground=new THREE.Group();ground.name='Distance-adaptive valley terrain';for(const geometry of createLandscapeTiles(groundGeo)){const tile=new THREE.Mesh(geometry,terrainMaterial);tile.receiveShadow=true;ground.add(tile);}const tunnel=createMountainTunnel();scene.add(ground,createLakeDetails(),createSandbar(),tunnel,createParkingLot());
+tunnel.updateMatrixWorld(true);tunnel.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
+const asphaltMaterial=new THREE.MeshStandardMaterial({...createAsphaltMaps(),color:0xffffff});
+function ribbon(points,width,color,y=.025,material=null,add=true){
+ const g=createRoadRibbonGeometry(points,width,{offset:y});
+ const o=new THREE.Mesh(g,material||new THREE.MeshStandardMaterial({color,roughness:.95,side:THREE.DoubleSide}));o.receiveShadow=true;if(add)scene.add(o);return o;
 }
-$('#start').addEventListener('click',()=>{if(state.status==='paused')pause();else start()});$('#restart').addEventListener('click',()=>start());$('#pause').addEventListener('click',pause);$('#action').addEventListener('click',()=>E.action(state));$('#touch-action').addEventListener('click',()=>E.action(state));$('#sound').addEventListener('click',()=>{sound=!sound;$('#sound').textContent=sound?'♪ ON':'♪ OFF';$('#sound').setAttribute('aria-label',sound?'Disable sound':'Enable sound');if(sound)beep(440)});
-const aliases={w:'ArrowUp',a:'ArrowLeft',s:'ArrowDown',d:'ArrowRight'};window.addEventListener('keydown',e=>{let k=aliases[e.key.toLowerCase()]||e.key;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(k))e.preventDefault();if(!e.repeat&&['p','P','Escape'].includes(k))pause();if(!e.repeat&&['e','E',' '].includes(k))E.action(state);keys.add(k)});window.addEventListener('keyup',e=>keys.delete(aliases[e.key.toLowerCase()]||e.key));window.addEventListener('blur',()=>{clearInput();if(state.status==='running')pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInput();if(state.status==='running')pause()}});
-document.querySelectorAll('[data-key]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);held.set(e.pointerId,b.dataset.key);b.classList.add('pressed')});const end=e=>{held.delete(e.pointerId);b.classList.remove('pressed')};b.addEventListener('pointerup',end);b.addEventListener('pointercancel',end);b.addEventListener('lostpointercapture',end)});
-let ui=0;function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;visual+=dt;const all=new Set([...keys,...held.values()]);E.update(state,{up:all.has('ArrowUp'),down:all.has('ArrowDown'),left:all.has('ArrowLeft'),right:all.has('ArrowRight')},dt);for(const ev of state.events.splice(0)){toast(ev.text);if(ev.type==='pickup'||ev.type==='ring'){beep(ev.type==='pickup'?660:880);for(let i=0;i<18;i++)particles.push({x:state.x,y:state.y,vx:(rand()-.5)*100,vy:(rand()-.5)*100,life:1,color:'#f5eda3'})}if(ev.type==='takeoff')beep(440,.3);if(ev.type==='bump')beep(120,.2);if(ev.type==='win')win();ui=.2}for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt*.7}particles=particles.filter(p=>p.life>0);toastTime-=dt;if(toastTime<=0)$('#toast').classList.remove('visible');ui+=dt;if(ui>.1){sync();ui=0}drawWorld();requestAnimationFrame(frame)}requestAnimationFrame(frame);
-})();
+const gravelMaterial=createGravelMaterial(),roadDust=new RoadDust();scene.add(roadDust);
+const roadPts=Array.from({length:641},(_,i)=>E.roadPoint(i/640*Math.PI*2));
+ribbon(roadPts,10.4,0x777a70,.06,gravelMaterial);ribbon(roadPts,8.4,0x363c3b,.09,asphaltMaterial);
+for(const [width,y,material,clipWidth] of [[6.5,.06,gravelMaterial,5.2],[4.5,.09,asphaltMaterial,4.2]]){const source=createCabinApproachGeometry(width,{offset:y}),mesh=new THREE.Mesh(clipRibbonOutsideRoad(source,roadPts,clipWidth),material);source.dispose();mesh.receiveShadow=true;scene.add(mesh);}
+scene.add(createExplorationScenery(roadPts,gravelMaterial,asphaltMaterial));
+const roadMarks=[],yellowMarks=[];
+for(let i=0;i<640;i+=5)yellowMarks.push(ribbon([roadPts[i],roadPts[i+1]],.14,0xe9b928,.106,null,false).geometry);
+for(const side of [-1,1]){const edge=roadPts.map((p,i)=>{const prev=roadPts[(i+639)%640],next=roadPts[(i+1)%640],dx=next.x-prev.x,dz=next.z-prev.z,l=Math.hypot(dx,dz)||1;return {x:p.x-dz/l*3.9*side,z:p.z+dx/l*3.9*side};});for(let i=1;i<edge.length;i++){if(cabinTurnoffOpening(edge[i].x,edge[i].z)||E.explorationAt(edge[i].x,edge[i].z).distance<1||(side===1&&E.EXPLORATION_ROUTES.some(r=>{const a=Math.atan2(edge[i].x,E.WORLD.centerZ-edge[i].z);return a>r.angle-.13&&a<r.angle+.04;})))continue;roadMarks.push(ribbon([edge[i-1],edge[i]],.075,0xdedbd0,.106,null,false).geometry);}}
+
+const centerLine=new THREE.Mesh(mergeGeometries(roadMarks),new THREE.MeshStandardMaterial({color:0xdedbd0,roughness:.9,side:THREE.DoubleSide}));centerLine.receiveShadow=true;scene.add(centerLine);roadMarks.forEach(g=>g.dispose());
+const yellowCenterLine=new THREE.Mesh(mergeGeometries(yellowMarks),new THREE.MeshStandardMaterial({color:0xe9b928,roughness:.9,side:THREE.DoubleSide}));yellowCenterLine.name='Yellow two-way centerline';yellowCenterLine.receiveShadow=true;scene.add(yellowCenterLine);yellowMarks.forEach(g=>g.dispose());
+// Roadside posts make the finite drivable edge legible, not an invisible wall.
+const postG=new THREE.CylinderGeometry(.065,.08,1,5),postM=new THREE.MeshStandardMaterial({color:0xd7cbb0});const posts=new THREE.InstancedMesh(postG,postM,192);const dummy=new THREE.Object3D();
+for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),q=E.roadPoint(a+.0001),length=Math.hypot(q.x-p.x,q.z-p.z),x=p.x+6.3*(q.z-p.z)/length,z=p.z-6.3*(q.x-p.x)/length;dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
+// Detailed needle cards and real trunks arranged around the mountain road.
+const forest=createForest(landHeight,E.roadRadius);scene.add(forest,createRoadSigns(landHeight,explorationSigns()),createCabinGrounding(landHeight));
+const forestGrass=createForestGrass(forest.getTreeLocations(),landHeight,{density:matchMedia('(pointer: coarse)').matches?.5:1});scene.add(forestGrass);
+let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
+
+const scenicBridge=createWaterfallBridge();scene.add(scenicBridge);scenicBridge.updateMatrixWorld(true);scenicBridge.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
+const minimap=createMinimap();document.body.append(minimap.element);
+const scenicRoadKm=(E.roadLength()/1000).toFixed(2);
+const engineExhaust=new EngineExhaust();scene.add(engineExhaust);
+const flightBarrier=createFlightBarrier(),waterWake=new WaterWake();scene.add(flightBarrier,createLandingCorridor(E.LANDING_CORRIDOR),waterWake);
+let jeep,plane,propeller,propellerBlur,flightSurfaces={},wheels=[],ready=false,visual=0,mode='chase',selectedVehicle='jeep',sound=false,audioCtx,osc,gain;
+const keys=new Set(),held=new Map(),frameTimes=[];let last=0,toastLife=0,updateClock=0;
+const woodMaps={map:surfaceMap('hardwood2_diffuse.jpg',{color:true,flipY:false}),bumpMap:surfaceMap('hardwood2_bump.jpg',{flipY:false}),roughnessMap:surfaceMap('hardwood2_roughness.jpg',{flipY:false})};
+const renderQuality=createRenderQuality({renderer,scene,onChange:settings=>{frameMetrics.reset();$('#quality-status').textContent=`${settings.preset[0].toUpperCase()+settings.preset.slice(1)} · textures ${settings.texturesEnabled?'on':'off'}`;}});
+$('#quality-preset').addEventListener('change',event=>renderQuality.setPreset(event.target.value));
+$('#surface-textures').addEventListener('change',event=>renderQuality.setTextures(event.target.checked));
+$('#render-settings').addEventListener('focusin',clearInput);
+new GLTFLoader().load('./assets/northbound.glb',gltf=>{
+ scene.add(gltf.scene);gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];for(let i=0;i<mats.length;i++){let m=mats[i];if(/cedar|deck|timber/i.test(m.name)){Object.assign(m,woodMaps);m.color.set(/deck/i.test(m.name)?0x968575:0xd1b395);m.bumpScale=.045;m.roughness=.82;m.needsUpdate=true;}if(/glazing/i.test(m.name)){const glass=new THREE.MeshPhysicalMaterial({name:m.name,color:0xb3c4c3,roughness:.095,metalness:0,transmission:.30,thickness:.12,ior:1.5,transparent:true,opacity:.88,envMapIntensity:1.35,side:THREE.DoubleSide});mats[i]=glass;}if(/Granite/i.test(m.name)){const stone=createRockMaterial();stone.name=m.name;mats[i]=stone;}if(/jeep paint|Floatplane yellow/i.test(m.name)){const paint=new THREE.MeshPhysicalMaterial();THREE.MeshStandardMaterial.prototype.copy.call(paint,m);paint.clearcoat=.55;paint.clearcoatRoughness=.22;paint.roughness=.35;mats[i]=paint;}if(/Aluminium/i.test(m.name)){m.metalness=.92;m.roughness=.29;}}o.material=Array.isArray(o.material)?mats:mats[0];if(/Meadow terrain|Gravel track/.test(o.name)||/Meadow|Interior shadow|Pine needles|Sunlit needles|Pine bark/.test(mats[0]?.name)||/Gravel road/.test(mats[0]?.name))o.visible=false;}
+ });
+ applyHeroMaterials(gltf.scene);
+ applyVehicleFidelity(gltf.scene);
+ applyJeepBody(gltf.scene);
+ applyPlaneBody(gltf.scene);
+ jeep=gltf.scene.getObjectByName('JeepRoot');plane=gltf.scene.getObjectByName('PlaneRoot');propeller=gltf.scene.getObjectByName('Propeller');wheels=['LeftFront','LeftRear','RightFront','RightRear'].map(n=>gltf.scene.getObjectByName('JeepWheel'+n)).filter(Boolean);
+ if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
+ const cockpitCamera=new CockpitCamera({jeep,plane});cameraRig.applyCockpit=(camera,state,active)=>cockpitCamera.apply(camera,state,active);
+ renderQuality.register(gltf.scene);
+ plane.position.set(E.PLANE_BERTH.x,E.FLIGHT.waterHeight,E.PLANE_BERTH.z);plane.rotation.set(0,-E.PLANE_BERTH.heading,0);
+ if(propeller){propellerBlur=createPropellerBlur();propeller.add(propellerBlur);}
+ for(const name of ['PlaneAileronLeft','PlaneAileronRight','PlaneElevatorLeft','PlaneElevatorRight','PlaneRudder'])flightSurfaces[name]=gltf.scene.getObjectByName(name);
+ gltf.scene.updateMatrixWorld(true);gltf.scene.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o;while(p){if(p===jeep||p===plane)return;p=p.parent;}cameraObstacles.push(o);});
+ for(const x of [-.75,.75]){const lamp=new THREE.SpotLight(0xffedca,95,38,.43,.6,2);lamp.position.set(x,1.1,-2);const target=new THREE.Object3D();target.position.set(x,.4,-19);jeep.add(target,lamp);lamp.target=target;}
+
+ ready=true;$('#drive').disabled=false;$('#fly').disabled=false;$('#start').disabled=false;$('#start').innerHTML='Drive from cabin parking <span>↗</span>';$('#fine').textContent='Drive Jeep starts at cabin parking · Fly Plane starts on the water · V switches';
+ window.__CABIN_READY__=true;
+},p=>{$('#loading').textContent=p.total?Math.round(p.loaded/p.total*100)+'%':'Loading';},err=>{
+ $('#fatal').classList.remove('hidden');$('#fatal').textContent='The 3D scene could not load. Serve this folder over HTTP (npm start), then reload. '+err.message;
+});
+
+function clearInput(){keys.clear();held.clear();document.querySelectorAll('[data-control]').forEach(b=>b.classList.remove('pressed'));}
+function toast(text){$('#toast').textContent=text;$('#toast').classList.add('visible');toastLife=4;}
+function start(){if(!ready)return;benchmarkView=null;E.begin(state,selectedVehicle);const qaParams=new URLSearchParams(location.search);if(qaParams.has('qa')&&state.phase==='jeep'){const stop=E.EXPLORATION_ROUTES.find(r=>r.id===qaParams.get('explore'));if(stop){const p=qaParams.has('junction')?stop.turnLane[15]:stop.points[25],q=qaParams.has('junction')?stop.turnLane[16]:stop.points[26];Object.assign(state,{x:p.x,z:p.z,y:E.terrainHeight(p.x,p.z),heading:Math.atan2(q.x-p.x,p.z-q.z)});}}mode='chase';$('#camera').innerHTML='Chase <b>C</b>';clearInput();$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').disabled=false;$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='jeep'?'Leave your parking bay toward the access aisle. Drive Jeep / Fly Plane changes vehicle.':'Space starts the engine. Shift adds power. At idle, B pushes backward on water.');}
+function pause(){if(!['running','paused'].includes(state.status))return;E.togglePause(state);clearInput();cameraRig.setEnabled(state.status==='running');if(state.status==='paused'){
+  $('#title').innerHTML='Stay a<br>little longer.';$('#description').textContent='Your drive or flight is paused. The lake can wait.';$('#start').innerHTML='Back to the lake <span>↗</span>';$('#restart').classList.remove('hidden');$('#steps').classList.add('hidden');$('#overlay').classList.remove('hidden');document.body.classList.add('intro-open');$('#pause').textContent='▶';$('#pause').setAttribute('aria-label','Resume game');
+ }else{$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();}}
+function switchVehicle(vehicle){if(!ready)return;selectedVehicle=typeof vehicle==='string'?vehicle:(state.phase==='jeep'?'plane':'jeep');if(state.status!=='running'){start();return;}if(state.phase===selectedVehicle){canvas.focus();return;}E.switchVehicle(state,selectedVehicle);clearInput();mode='chase';$('#camera').innerHTML='Chase <b>C</b>';cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='plane'?'Space starts the engine. Wait for idle, then Shift to accelerate and W to lift off.':'W / S throttle and reverse · A / D steer · Shift to accelerate.');}
+function changeCamera(){if(!ready)return;mode=mode==='chase'?'orbit':mode==='orbit'?'cockpit':mode==='cockpit'?'cabin':'chase';cameraRig.setMode(mode,state);$('#camera').innerHTML=(mode==='chase'?'Chase':mode==='orbit'?'Orbit':mode==='cockpit'?'Cockpit':'Cabin')+' <b>C</b>';}
+function formatTime(t){return String(Math.floor(t/60)).padStart(2,'0')+':'+(t%60).toFixed(1).padStart(4,'0');}
+function sync(){
+ const flying=state.phase==='plane',off=flying&&state.enginePhase==='off'&&!state.parked,starting=flying&&state.enginePhase==='starting';
+ $('#vehicle').textContent=flying?'YELLOW FLOATPLANE':'4 × 4 JEEP';$('#time').textContent=formatTime(state.elapsed);$('#metric-label').textContent=flying?'ALTITUDE':'SPEED';$('#metric').innerHTML=flying?Math.round(state.y)+' <small>m</small>':Math.round(Math.abs(state.speed)*3.6)+' <small>km/h</small>';$('#drive').setAttribute('aria-pressed',String(!flying));$('#fly').setAttribute('aria-pressed',String(flying));$('#chapter').textContent=flying?'02 / ABOVE THE LAKE':'01 / THE MOUNTAIN ROAD';$('#objective').innerHTML=flying?'Find your<br>way home.':'Take the long<br>way home.';
+ $('#instructions').textContent=!flying?'Follow the forest S-bends up the mountain, through the carved tunnel, and down to the waterfall bridge. The paved side road leads home. Follow the western gravel turnoffs to Lake Overlook (V), Cedar Cove (C), and Pine Clearing (P); slow down at each stop to discover it.':state.parked?'Moored with the engine off. Space releases the mooring, then Space starts the engine.':off?'Press Space to start the engine. After the three-second startup, hold Shift to add power and W to lift off.':starting?'Engine starting. Wait for steady idle before adding throttle.':state.onWater?'Shift adds power; Control brakes. At idle, hold B to push backward on water. W lifts off above 36 km/h. Space moors beside the dock.':state.landingStatus==='approach'?'Aligned with the buoy corridor. Control reduces engine power in the air; it is not a wheel brake. Use S to descend. The floats settle onto the water, then Control slows your taxi.':'Shift adds power; Control reduces it gradually in the air. W / S pitch, A / D bank. Approach the cabin between the two buoy lines, slow and descend to land.';
+ $('#checklist').innerHTML=flying?'<div><span>↟</span> Airspeed <b>'+Math.round(state.speed*3.6)+' km/h</b></div><div><span>↗</span> Throttle <b>'+Math.round((state.throttle||0)*100)+'%</b></div><div><span>◉</span> Engine <b>'+(off?'OFF':starting?'STARTING':Math.round(state.propRPM||0)+' RPM')+'</b></div>':'<div><span>↟</span> Lake stops <b>'+state.visitedStops.length+' / 3</b></div><div><span>↻</span> Scenic road <b>'+scenicRoadKm+' km</b></div>';
+ $('#controls-copy').innerHTML=flying?'<b>W S</b> pitch <b>A D</b> bank <b>SHIFT</b> throttle up <b>CTRL</b> '+(state.onWater?'water brake · <b>B</b> push backward':'throttle down'):'<b>W S</b> throttle & reverse <b>A D</b> steer <b>SHIFT</b> accelerate';
+ const canAct=state.actionReady||state.parked||off||starting;$('#interact').classList.toggle('hidden',!canAct);$('#interact').disabled=starting;
+ const actionText=state.parked?'Release mooring':off?'Start engine':starting?'Starting engine · '+Math.ceil(state.engineStartRemaining)+'s':flying?'Moor at the dock':'Park by the cabin';$('#interact').innerHTML=actionText+' <span>SPACE</span>';$('#touch-action').textContent=state.parked?'UNMOOR':off?'START':starting?'STARTING':flying?'MOOR':'PARK';$('#touch-action').disabled=!canAct||starting;
+ $('[data-control=reverse]').classList.toggle('hidden',!flying||!state.onWater);$('[data-control=boost]').textContent=flying?'THR +':'BOOST';$('[data-control=brake]').textContent=flying?(state.onWater?'WATER BRAKE':'THR −'):'BRAKE';
+ const warning=flying&&state.status==='running'&&state.boundaryStatus!=='inside';$('#boundary-notice').classList.toggle('hidden',!warning);document.body.classList.toggle('flight-limit',warning);
+ if(warning)$('#boundary-notice').textContent=state.boundaryStatus==='warning'?'Valley boundary ahead · Turn toward the lake':state.boundaryStatus==='outside'?'Outside the valley · Return in '+Math.ceil(state.boundaryRemaining)+'s':'Turning back toward the lake · Steering assist active';
+ $('#landing-guide').classList.toggle('hidden',!(flying&&state.status==='running'&&['approach','touchdown'].includes(state.landingStatus)));$('#landing-guide').textContent=state.landingStatus==='touchdown'?'Touchdown · Hold Control to slow on the water':'Water approach aligned · Reduce power and descend between the buoys';
+}
+$('#start').addEventListener('click',()=>state.status==='paused'?pause():start());$('#restart').addEventListener('click',start);$('#pause').addEventListener('click',pause);$('#drive').addEventListener('click',()=>switchVehicle('jeep'));$('#fly').addEventListener('click',()=>switchVehicle('plane'));$('#camera').addEventListener('click',changeCamera);$('#interact').addEventListener('click',()=>{E.action(state);canvas.focus();sync();});$('#touch-action').addEventListener('click',()=>{E.action(state);canvas.focus();sync();});
+$('#sound').addEventListener('click',()=>{sound=!sound;$('#sound').textContent=sound?'Sound on':'Sound off';$('#sound').setAttribute('aria-pressed',String(sound));if(sound&&!audioCtx){audioCtx=new AudioContext();osc=audioCtx.createOscillator();gain=audioCtx.createGain();osc.type='triangle';osc.connect(gain);gain.connect(audioCtx.destination);gain.gain.value=0;osc.start();}if(audioCtx)audioCtx.resume();});
+const aliases={w:'up',ArrowUp:'up',s:'down',ArrowDown:'down',a:'left',ArrowLeft:'left',d:'right',ArrowRight:'right',Shift:'boost',Control:'brake',b:'reverse'};
+window.addEventListener('keydown',e=>{if(isPauseShortcut(e)){e.preventDefault();pause();return;}if(isSettingsInput(e.target))return;const key=aliases[e.key]||aliases[e.key.toLowerCase()];if(key){e.preventDefault();keys.add(key);}if(!e.repeat){if(['v','V'].includes(e.key))switchVehicle();if(['c','C'].includes(e.key))changeCamera();if(e.key===' '){e.preventDefault();E.action(state);}}});window.addEventListener('keyup',e=>keys.delete(aliases[e.key]||aliases[e.key.toLowerCase()]));
+window.addEventListener('blur',()=>{clearInput();if(state.status==='running')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInput();if(state.status==='running')pause();}});
+document.querySelectorAll('[data-control]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);held.set(e.pointerId,b.dataset.control);b.classList.add('pressed');});const end=e=>{held.delete(e.pointerId);b.classList.remove('pressed');};for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,end);});
+window.addEventListener('pagehide',()=>{cameraRig.dispose();engineExhaust.dispose();environmentTarget?.dispose();pmrem.dispose();},{once:true});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderQuality.resize();});
+
+// Public read-only diagnostics; optional QA commands exist only with ?qa=1.
+window.cabinDiagnostics=()=>({environment:{...environmentMetrics},fullFrame:frameMetrics.snapshot(),quality:renderQuality.settings(),benchmarkView,cameraPosition:camera.position.toArray(),build:'integrated-cabin-turnoff-2',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},grass:{...forestGrass.userData.grass},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
+if(new URLSearchParams(location.search).has('qa'))window.cabinQA={benchmark:name=>{
+ if(!['jeep','lake','cabin','waterfall'].includes(name))throw new RangeError('Unknown benchmark view');
+ clearInput();cameraRig.setEnabled(false);E.begin(state,name==='lake'?'plane':'jeep');benchmarkView=name;visual=0;lastEnvironmentRefresh=-Infinity;
+ const views={jeep:[[-32,7,-3],[-16,2,-9]],lake:[[-45,7,43],[-30,1,30]],cabin:[[-49,24,55],[0,4,-7]],waterfall:[[52,37,937],[0,29,991]]};
+ camera.position.set(...views[name][0]);camera.lookAt(...views[name][1]);camera.updateMatrixWorld();
+ $('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');sync();frameMetrics.reset();
+ },textureAudit:renderQuality.audit,setReflectionProbe:enabled=>{reflectionProbe=!!enabled;},setQuality:renderQuality.setPreset,setTextures:renderQuality.setTextures,resetMetrics:frameMetrics.reset,setGrassDensity:forestGrass.setDensity,setGrassWind:forestGrass.setWind,state,start,pause,switchVehicle,action:()=>E.action(state),setMode:m=>{mode=m;cameraRig.setMode(mode,state);},input:keys};
+
+function frame(t){const measuredDelta=frameMetrics.begin(t);if(last&&state.status==='running'){frameTimes.push(t-last);if(frameTimes.length>240)frameTimes.shift();}const dt=benchmarkView?0:Math.min((t-last)/1000||0,.05);last=t;visual+=dt;const active=new Set([...keys,...held.values()]);const input=Object.fromEntries([...active].map(k=>[k,true]));E.update(state,input,dt);
+ if(ready){
+  if(state.status!=='ready'){
+   const vehicle=state.phase==='jeep'?jeep:plane;vehicle.position.set(state.x,state.y,state.z);vehicle.rotation.set(state.pitch,-state.heading,state.roll,'YXZ');
+   const parked=state.phase==='jeep'?plane:jeep;parked.position.set(...(state.phase==='jeep'?[E.PLANE_BERTH.x,E.FLIGHT.waterHeight,E.PLANE_BERTH.z]:[E.HOME.x,E.terrainHeight(E.HOME.x,E.HOME.z),E.HOME.z]));parked.rotation.set(0,state.phase==='jeep'?-E.PLANE_BERTH.heading:Math.PI/2,0);
+   if(!benchmarkView){cameraRig.setEnabled(state.status==='running');cameraRig.update(state,dt);}
+  }
+  if(propeller){const rpm=state.phase==='plane'&&!state.parked?(state.propRPM||0):0;if(state.status==='running')propeller.rotation.z=(propeller.rotation.z+dt*rpm*Math.PI*2/60)%(Math.PI*2);if(propellerBlur){propellerBlur.material.uniforms.amount.value=THREE.MathUtils.clamp((rpm-700)/1500,0,1);propellerBlur.material.uniforms.phase.value=propeller.rotation.z*.27;}}
+  for(const [name,angle] of [['PlaneAileronLeft',state.aileronAngle||0],['PlaneAileronRight',-(state.aileronAngle||0)],['PlaneElevatorLeft',-(state.elevatorAngle||0)],['PlaneElevatorRight',-(state.elevatorAngle||0)],['PlaneRudder',state.rudderAngle||0]]){const node=flightSurfaces[name];if(node)node.rotation[name==='PlaneRudder'?'y':'x']=THREE.MathUtils.clamp(angle,-.349,.349);}
+  if(state.phase==='jeep'&&state.status==='running')for(const wheel of wheels){wheel.rotation.order='YXZ';wheel.rotation.x-=state.speed*dt/.588;if(wheel.name.includes('Front'))wheel.rotation.y=-(state.steeringAngle||0);}
+ }
+ engineExhaust.update(state,state.status==='running'?dt:0,plane);
+ roadDust.update(state,state.status==='running'?dt:0);waterWake.update(state,state.status==='running'?dt:0);
+ water.material.uniforms.time.value+=dt*.55;scenicBridge.update(visual);minimap.update(state);
+ applyDaylight(daylightStateAt(visual),{skyMaterial:skyMat,sun,sunDirection,ambient,water,renderer,scene});
+ if(ready&&visual-lastEnvironmentRefresh>20){refreshSkyEnvironment();lastEnvironmentRefresh=visual;}
+ flightBarrier.visible=state.phase==='plane'&&state.status==='running'&&state.boundaryStatus!=='inside';flightBarrier.material.uniforms.strength.value=state.boundaryStatus==='warning'?.7:1;flightBarrier.material.uniforms.outside.value=state.boundaryStatus==='warning'?0:1;flightBarrier.material.uniforms.time.value=visual;
+ for(const ev of state.events.splice(0))toast(ev.text);toastLife-=dt;if(toastLife<=0)$('#toast').classList.remove('visible');
+ updateClock+=dt;if(updateClock>.1){sync();updateClock=0;}
+ const target=state.phase==='jeep'?E.HOME:E.DOCK,point=new THREE.Vector3(target.x,6,target.z).project(camera);const visible=point.z<1&&Math.abs(point.x)<.94&&Math.abs(point.y)<.92;$('#waypoint').style.opacity=visible?'1':'0';$('#waypoint').style.left=(point.x*.5+.5)*innerWidth+'px';$('#waypoint').style.top=(-point.y*.5+.5)*innerHeight+'px';$('#waypoint-label').textContent=state.phase==='jeep'?'The cabin':'Floatplane dock';$('#waypoint-distance').textContent=Math.round(Math.hypot(target.x-state.x,target.z-state.z))+' m';
+ if(audioCtx){const running=sound&&state.status==='running'&&!state.parked&&(state.phase!=='plane'||state.enginePhase!=='off');gain.gain.setTargetAtTime(running?.022:0,audioCtx.currentTime,.15);osc.frequency.setTargetAtTime(state.phase==='plane'?30+(state.propRPM||0)/18:35+Math.abs(state.speed)*8,audioCtx.currentTime,.1);}
+ const lightTarget=state.status==='ready'||mode==='cabin'?new THREE.Vector3(0,2,-7):new THREE.Vector3(state.x,state.y,state.z);sun.target.position.lerp(lightTarget,Math.min(1,dt*2));sun.position.copy(sun.target.position).addScaledVector(sunDirection,110);
+ forest.updateLOD(camera.position,camera);forestGrass.update(visual,camera.position);
+ renderer.render(scene,camera);frameMetrics.end(document.hidden?null:measuredDelta);requestAnimationFrame(frame);
+}requestAnimationFrame(frame);
+
