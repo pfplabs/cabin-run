@@ -22,7 +22,7 @@ test('dense driveway ribbon stays above the actual land across the usable width'
 test('road normals face upward and gravel has distinct original detail',()=>{
  const points=Array.from({length:60},(_,i)=>roadPoint(i/59*Math.PI*2)),g=createRoadRibbonGeometry(points,8.4);
  assert.ok(g.attributes.position.array.every(Number.isFinite));for(let i=0;i<g.attributes.normal.count;i++)assert.ok(g.attributes.normal.getY(i)>0);
- const material=createGravelMaterial();assert.ok(material.map.isDataTexture);assert.ok(material.bumpMap.isDataTexture);assert.ok(material.roughness>.9);
+ const material=createGravelMaterial();assert.ok(material.map.isDataTexture);assert.ok(material.normalMap.isDataTexture && material.roughnessMap.isDataTexture);assert.ok(material.roughness>.9);
 });
 test('gravel classification distinguishes asphalt, shoulders and cabin driveway',()=>{
  const p=roadPoint(-Math.PI/2);assert.equal(isGravel(p.x,p.z),false);assert.equal(isGravel(p.x-5,p.z),true);assert.equal(isGravel(-26,-9),false);assert.equal(isGravel(-16,-9),true);

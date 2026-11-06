@@ -17,20 +17,7 @@ export function createRoadRibbonGeometry(points,width,{offset=.08,spacing=1,heig
  }
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();return g;
 }
-export function createGravelMaterial(){
- const n=256,data=new Uint8Array(n*n*4),height=new Uint8Array(n*n*4);
- const hash=(x,y)=>{let h=Math.imul(x+83,374761393)^Math.imul(y+17,668265263);h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967295;};
- for(let y=0;y<n;y++)for(let x=0;x<n;x++){
-  const px=x/5,py=y/5,gx=Math.floor(px),gy=Math.floor(py);let nearest=10,tint=.5;
-  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const a=gx+dx,b=gy+dy,sx=a+hash(a,b),sy=b+hash(b,a+5),d=Math.hypot(px-sx,(py-sy)*1.2);if(d<nearest){nearest=d;tint=hash(a+19,b);}}
-  const stone=Math.max(0,1-nearest*1.45),v=74+65*stone+35*tint,i=(y*n+x)*4;
-  data[i]=v;data[i+1]=v*.96;data[i+2]=v*.85;data[i+3]=255;height[i]=height[i+1]=height[i+2]=stone*200;height[i+3]=255;
- }
- const map=new THREE.DataTexture(data,n,n),bump=new THREE.DataTexture(height,n,n);
- for(const t of [map,bump]){t.wrapS=t.wrapT=THREE.RepeatWrapping;t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearMipmapLinearFilter;t.generateMipmaps=true;t.needsUpdate=true;}
- map.colorSpace=THREE.SRGBColorSpace;
- return new THREE.MeshStandardMaterial({map,bumpMap:bump,bumpScale:.035,roughness:.98,color:0xffffff});
-}
+export {createGravelMaterial} from './gravel-material.js';
 export function isGravel(x,z){
  let driveDistance=Infinity;
  for(let i=1;i<DRIVEWAY.length;i++){const a=DRIVEWAY[i-1],b=DRIVEWAY[i],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);driveDistance=Math.min(driveDistance,Math.hypot(x-a.x-t*dx,z-a.z-t*dz));}
