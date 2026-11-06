@@ -2,7 +2,7 @@
 Run: blender --background --python scripts/build_scene.py
 Coordinates passed to helpers use browser convention: X right, Y up, -Z forward.
 """
-import bpy, math, random, os, json
+import bpy, math, random, os, json, bmesh
 from mathutils import Vector
 random.seed(13)
 print('Starting scene', flush=True)
@@ -35,19 +35,59 @@ def finish(o,name,material,parent=None):
     if parent: o.parent=parent
     return o
 def box(name,p,s,m,bevel=0,parent=None):
-    bpy.ops.mesh.primitive_cube_add(size=1,location=v(p)); o=bpy.context.object; o.dimensions=(s[0],s[2],s[1]); bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+    # Direct mesh allocation avoids repeated scene updates from primitive operators.
+    verts=[(p[0]+x*s[0]/2,p[1]+y*s[1]/2,p[2]+z*s[2]/2) for x,y,z in [(-1,-1,-1),(1,-1,-1),(1,1,-1),(-1,1,-1),(-1,-1,1),(1,-1,1),(1,1,1),(-1,1,1)]]
+    o=mesh(name,verts,[(0,3,2,1),(4,5,6,7),(0,1,5,4),(3,7,6,2),(0,4,7,3),(1,2,6,5)],m,parent)
     if bevel:
-        mod=o.modifiers.new('Soft edges','BEVEL');mod.width=bevel;mod.segments=2
-        bpy.ops.object.modifier_apply(modifier=mod.name)
-    return finish(o,name,m,parent)
+        bm=bmesh.new();bm.from_mesh(o.data)
+        bmesh.ops.bevel(bm,geom=list(bm.edges),offset=bevel,segments=3,affect='EDGES')
+        bm.to_mesh(o.data);bm.free()
+    return o
 def mesh(name,verts,faces,m,parent=None):
     data=bpy.data.meshes.new(name);data.from_pydata([v(p) for p in verts],[],faces);data.update();o=bpy.data.objects.new(name,data);bpy.context.collection.objects.link(o);return finish(o,name,m,parent)
-def beam(name,a,b,r,m,parent=None,vertices=10):
-    a,b=v(a),v(b);d=b-a;bpy.ops.mesh.primitive_cylinder_add(vertices=vertices,radius=r,depth=d.length,location=(a+b)/2);o=bpy.context.object;o.rotation_euler=d.to_track_quat('Z','Y').to_euler();return finish(o,name,m,parent)
+def beam(name,a,b,r,m,parent=None,vertices=12):
+    va,vb=Vector(a),Vector(b);direction=(vb-va).normalized()
+    u=direction.cross(Vector((0,1,0)))
+    if u.length<.001:u=direction.cross(Vector((1,0,0)))
+    u.normalize();w=direction.cross(u).normalized()
+    verts=[tuple(c+r*(u*math.cos(i*math.tau/vertices)+w*math.sin(i*math.tau/vertices))) for c in (va,vb) for i in range(vertices)]
+    faces=[tuple(reversed(range(vertices))),tuple(range(vertices,2*vertices))]+[(i,(i+1)%vertices,(i+1)%vertices+vertices,i+vertices) for i in range(vertices)]
+    o=mesh(name,verts,faces,m,parent)
+    for f in o.data.polygons:f.use_smooth=len(f.vertices)==4
+    return o
 def ellipsoid(name,p,s,m,parent=None):
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=8,radius=1,location=v(p));o=bpy.context.object;o.scale=(s[0],s[2],s[1]);bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+    verts=[];faces=[];N=24;R=12
+    for j in range(R+1):
+        t=math.pi*j/R
+        for i in range(N):
+            a=i*math.tau/N;verts.append((p[0]+s[0]*math.sin(t)*math.cos(a),p[1]+s[1]*math.cos(t),p[2]+s[2]*math.sin(t)*math.sin(a)))
+    for j in range(R):
+        for i in range(N):faces.append((j*N+i,j*N+(i+1)%N,(j+1)*N+(i+1)%N,(j+1)*N+i))
+    o=mesh(name,verts,faces,m,parent)
     for f in o.data.polygons:f.use_smooth=True
-    return finish(o,name,m,parent)
+    return o
+
+def boulder(name,p,s,m):
+    # Smooth broad fracture planes, irregular outline, no triangular ico facets.
+    o=ellipsoid(name,p,s,m)
+    for vert in o.data.vertices:
+        q=vert.co-v(p);n=q.normalized()
+        k=1+.10*math.sin(n.x*7+n.y*5)+.055*math.sin(n.z*11-n.x*4)
+        vert.co=v(p)+q*k
+    return o
+
+def ring(name,p,r,t,m,parent=None,axis='X',segments=40):
+    verts=[];faces=[]
+    for i in range(segments):
+        a=math.tau*i/segments
+        for j in range(8):
+            b=math.tau*j/8;d=r+t*math.cos(b);q=t*math.sin(b)
+            verts.append((p[0]+q,p[1]+d*math.cos(a),p[2]+d*math.sin(a)) if axis=='X' else (p[0]+d*math.cos(a),p[1]+d*math.sin(a),p[2]+q))
+    for i in range(segments):
+        for j in range(8):faces.append((i*8+j,((i+1)%segments)*8+j,((i+1)%segments)*8+(j+1)%8,i*8+(j+1)%8))
+    o=mesh(name,verts,faces,m,parent)
+    for f in o.data.polygons:f.use_smooth=True
+    return o
 def empty(name):
     o=bpy.data.objects.new(name,None);bpy.context.collection.objects.link(o);return o
 def shore(x): return 7+2.3*math.sin(x*.075)+.7*math.sin(x*.31)
@@ -136,6 +176,43 @@ for x in [i*.3-3 for i in range(49)]:
 for a,b in [(-3,-.15),(2.4,11.5)]:box('Porch handrail',((a+b)/2,3.12,-2.75),(b-a,.14,.16),M['cedar'])
 for i in range(4):box('Porch stair',(1.1,1.65-i*.22,-2.3+i*.48),(2.6,.2,.56),M['deck'])
 
+# Architectural details: gutter/downpipes, recessed warm lamps, mortar courses,
+# usable interior furniture. Geometry remains batched by material at export.
+M['lamp']=mat('Warm lamp diffuser',(1,.72,.36),.3)
+M['lamp'].node_tree.nodes.get('Principled BSDF').inputs['Emission Color'].default_value=(1,.55,.18,1)
+M['lamp'].node_tree.nodes.get('Principled BSDF').inputs['Emission Strength'].default_value=2
+M['fabric']=mat('Woven oatmeal upholstery',(.43,.39,.31),.92)
+M['mortar']=mat('Stone mortar',(.20,.21,.19),.95)
+for x in [-3.95,19.95]:
+    beam('Rain gutter',(x,6.96,-21),(x,6.96,-4.8),.11,M['black'])
+    beam('Downpipe elbow',(x,6.96,-19.8),(x+(.8 if x<0 else -.8),6.5,-19.8),.075,M['black'])
+    px=x+(.8 if x<0 else -.8)
+    beam('Downpipe',(px,6.5,-19.8),(px,1.1,-19.8),.075,M['black'])
+    for y in [2,4,6]:box('Downpipe clip',(px,y,-19.8),(.19,.055,.19),M['silver'])
+for x in [-.6,10.1]:
+    box('Porch sconce backplate',(x,3.8,-6.32),(.28,.55,.08),M['black'],.035)
+    box('Warm sconce glass',(x,3.8,-6.17),(.22,.37,.21),M['lamp'],.025)
+    for y in [3.57,4.03]:box('Sconce cap',(x,y,-6.17),(.33,.065,.3),M['black'],.025)
+    for dx in [-.13,.13]:beam('Sconce cage',(x+dx,3.58,-6.04),(x+dx,4.03,-6.04),.018,M['black'])
+for y in [7+i*.38 for i in range(12)]:
+    box('Chimney mortar front',(0,y,-15.29),(1.6,.025,.012),M['mortar'])
+    box('Chimney mortar side',(.81,y,-16),(.012,.025,1.4),M['mortar'])
+for x in [-.55,.55]:beam('Chimney cap riser',(x,11.65,-16),(x,12.1,-16),.055,M['black'])
+box('Raised chimney weather hood',(0,12.15,-16),(2.1,.13,1.9),M['black'],.04)
+for x in [12.6,13.6,14.6]:box('Sofa seat cushion',(x,2.42,-10.65),(.92,.18,.91),M['fabric'],.08)
+for x in [12.2,15]:box('Sofa arm',(x,2.4,-10.8),(.25,.65,1.2),M['fabric'],.08)
+box('Interior woven rug',(13.8,1.65,-9.2),(4.5,.025,3.3),M['fabric'])
+box('Dining tabletop',(16.5,2.45,-11.7),(1.9,.15,1.3),M['lightwood'],.04)
+for x in [15.8,17.2]:
+    for z in [-12.15,-11.25]:beam('Dining table leg',(x,1.6,z),(x,2.42,z),.045,M['black'])
+for x in [15.2,17.8]:
+    box('Dining chair seat',(x,2,-11.7),(.55,.11,.62),M['fabric'],.04)
+    box('Dining chair back',(x,2.45,-12),(.55,.75,.10),M['lightwood'],.04)
+    for dx in [-.22,.22]:
+        for dz in [-.23,.23]:beam('Dining chair leg',(x+dx,1.6,-11.7+dz),(x+dx,2,-11.7+dz),.025,M['black'])
+box('Book on table',(13.3,2.14,-8.65),(.45,.08,.30),M['white'],.01)
+beam('Coffee cup',(14.1,2.1,-8.65),(14.1,2.28,-8.65),.08,M['white'],vertices=20)
+
 print('Cabin ready', flush=True)
 # Jetty is a real planked structure on stilts.
 for i in range(30):box('Dock plank',(-18,1.45,2+i*.48),(5.6,.16,.43),M['deck'])
@@ -157,14 +234,11 @@ beam('Canoe paddle',(-13.5,.7,12.8),(-12.5,.7,16),.04,M['lightwood'])
 # A rocky stream on the right flows to the lake.
 for i in range(18):
     z=-27+i*2;x=27+math.sin(i*.4)*2.2
-    for side in [-1,1]:
-        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1,location=v((x+side*1.8,height(x,z)+.1,z)))
-        o=bpy.context.object;o.scale=(1.2+random.random(),1.2,1);finish(o,'Stream granite',M['stoneLight'])
+    for side in [-1,1]:boulder('Stream granite',(x+side*1.8,height(x,z)+.1,z),(1.2+random.random(),.8+random.random()*.4,1.2),M['stoneLight'])
     box('Stream bed',(x,height(x,z)+.12,z),(3.3,.09,2.3),M['glass'])
 for i in range(20):
-    x=random.uniform(30,49);z=random.uniform(-25,6)
-    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=random.uniform(.6,2.3),location=v((x,height(x,z)+.4,z)))
-    o=bpy.context.object;o.scale=(1.3,1,.8);finish(o,'Glacial boulder',M['stone'])
+    x=random.uniform(30,49);z=random.uniform(-25,6);r=random.uniform(.6,2.3)
+    boulder('Glacial boulder',(x,height(x,z)+.4,z),(r*1.3,r*.8,r),M['stone'])
 
 # Icelandic flag, constructed as a double-sided gently curved grid.
 beam('Flagpole',(33,1.1,2),(33,11.5,2),.055,M['silver'])
@@ -184,8 +258,9 @@ for i in range(65):
     h=random.uniform(5,13);base=height(x,z)
     beam('Pine trunk',(x,base,z),(x,base+h*.85,z),.13,M['trunk'],vertices=6)
     for k in range(4):
-        bpy.ops.mesh.primitive_cone_add(vertices=7,radius1=h*(.20-.029*k),radius2=0,depth=h*.48,location=v((x,base+h*(.32+.16*k),z)))
-        finish(bpy.context.object,'Pine crown',M['pine'] if (i+k)%3 else M['pine2'])
+        r=h*(.20-.029*k);y=base+h*(.32+.16*k);depth=h*.48
+        verts=[(x+r*math.cos(j*math.tau/7),y-depth/2,z+r*math.sin(j*math.tau/7)) for j in range(7)]+[(x,y+depth/2,z)]
+        mesh('Pine crown',verts,[tuple(range(7))]+[(j,7,(j+1)%7) for j in range(7)],M['pine'] if (i+k)%3 else M['pine2'])
 
 print('Forest ready', flush=True)
 # Hero jeep, separate transform root for gameplay.
@@ -201,23 +276,96 @@ for x in [-1,1]:
     box('Door',(x,1.22,.1),(.1,.65,1.7),M['jeep'],.03,jeep)
     box('Mirror',(x*1.2,1.8,-.7),(.28,.18,.25),M['black'],.04,jeep)
     for z in [-1.25,1.25]:
-        beam('Jeep tire',(x*.9,.65,z),(x*1.25,.65,z),.57,M['black'],jeep,16)
-        beam('Wheel hub',(x*1.24,.65,z),(x*1.27,.65,z),.29,M['silver'],jeep,12)
+        wheel=empty('JeepWheel'+('Left' if x<0 else 'Right')+('Front' if z<0 else 'Rear'))
+        wheel.parent=jeep;wheel.location=v((x*1.09,.65,z))
+        ring('Rounded all terrain sidewall',(0,0,0),.425,.145,M['black'],wheel)
+        beam('Wheel barrel',(-.16,0,0),(.16,0,0),.29,M['black'],wheel,32)
+        ring('Machined rim lip',(x*.168,0,0),.26,.025,M['silver'],wheel)
+        beam('Central hub',(x*.16,0,0),(x*.205,0,0),.095,M['silver'],wheel,20)
+        for j in range(6):
+            t=j*math.tau/6
+            beam('Alloy spoke',(x*.175,.085*math.cos(t),.085*math.sin(t)),(x*.175,.24*math.cos(t),.24*math.sin(t)),.036,M['silver'],wheel,8)
+            beam('Wheel lug',(x*.20,.065*math.cos(t),.065*math.sin(t)),(x*.22,.065*math.cos(t),.065*math.sin(t)),.016,M['black'],wheel,6)
+        for j in range(36):
+            t=j*math.tau/36
+            for dx in [-.10,.10]:
+                # Tangential blocks follow the tire circumference and are not cubes floating off the tread.
+                o=box('Tire tread block',(0,0,0),(.15,.045,.085),M['black'],.012,wheel)
+                o.location=v((dx,.565*math.cos(t),.565*math.sin(t)));o.rotation_euler.x=t
+        # Continuous flared sheet-metal arch, not a chain of capped cylinders.
+        fv=[];ff=[];steps=24
+        for j in range(steps+1):
+            a=math.pi*j/steps
+            for xx,r in [(x*.98,.675),(x*1.27,.675),(x*1.27,.745),(x*.98,.745)]:
+                fv.append((xx,.65+r*math.sin(a),z+r*math.cos(a)))
+        for j in range(steps):
+            for k in range(4):ff.append((j*4+k,j*4+(k+1)%4,(j+1)*4+(k+1)%4,(j+1)*4+k))
+        ff.extend([(3,2,1,0),tuple(steps*4+k for k in range(4))])
+        arch=mesh('Continuous fender flare',fv,ff,M['black'],jeep)
+        # Outward normals for mirrored sides, with hard profile edges retained.
+        bm=bmesh.new();bm.from_mesh(arch.data);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(arch.data);bm.free()
 for x in [-.78,.78]:ellipsoid('Jeep headlight',(x,1.1,-2.02),(.22,.22,.08),M['white'],jeep)
 for x in [-.45,-.3,-.15,0,.15,.3,.45]:box('Grille',(x,1,-2.04),(.07,.42,.07),M['black'],0,jeep)
 box('Bull bar',(0,.8,-2.23),(2.35,.14,.14),M['silver'],.04,jeep)
 for x in [-.65,-.22,.22,.65]:ellipsoid('Rally lamp',(x,1.45,-2.1),(.18,.18,.10),M['white'],jeep)
 beam('Spare tire',(0,1.1,2.03),(0,1.1,2.34),.55,M['black'],jeep,16)
 for x in [-.75,.75]:beam('Roof rack',(x,2.45,-.7),(x,2.45,1.4),.05,M['silver'],jeep)
+# Functional-looking vehicle details without badges or branding.
+for x in [-.94,.94]:
+    box('Rock slider',(x,.58,.1),(.25,.14,1.65),M['silver'],.04,jeep)
+    box('Door pull',(x*1.10,1.43,.34),(.06,.06,.27),M['silver'],.025,jeep)
+    beam('Mirror arm',(x,1.65,-.7),(x*1.25,1.8,-.7),.035,M['silver'],jeep)
+    box('Mirror reflective face',(x*1.28,1.8,-.55),(.22,.12,.025),M['silver'],.02,jeep)
+    box('Front seat',(x*.55,1.1,.2),(.65,.18,.75),M['fabric'],.08,jeep)
+    box('Front seat back',(x*.55,1.5,.55),(.65,.85,.17),M['fabric'],.08,jeep)
+    box('Head rest',(x*.55,2,.55),(.36,.23,.14),M['black'],.05,jeep)
+    box('Rear tail lamp',(x*.85,1.35,1.90),(.20,.30,.08),M['red'],.035,jeep)
+    beam('Roof rack side',(x*.8,2.6,-.8),(x*.8,2.6,1.5),.04,M['silver'],jeep)
+    for z in [-.7,1.4]:beam('Rack foot',(x*.8,2.35,z),(x*.8,2.6,z),.035,M['black'],jeep)
+box('Dashboard',(0,1.5,-.65),(1.8,.22,.35),M['black'],.04,jeep)
+ring('Steering wheel',(-.51,1.68,-.35),.22,.025,M['black'],jeep,axis='Z')
+for x in [-.65,.65]:
+    beam('Wiper',(x,1.5,-.91),(x+.3,1.85,-.91),.018,M['black'],jeep,6)
+for z in [-.7,0,.7,1.4]:beam('Rack crossbar',(-.8,2.55,z),(.8,2.55,z),.035,M['silver'],jeep)
+for z in [-2.15,2.10]:box('Heavy bumper',(0,.58,z),(2.25,.25,.25),M['black'],.07,jeep)
+for x in [-.85,.85]:beam('Tow eye',(x,.5,-2.25),(x,.65,-2.25),.04,M['silver'],jeep)
+box('Rear window',(0,1.86,1.59),(1.8,.66,.045),M['glass'],.025,jeep)
 jeep.location=v((-16,.92,-9));jeep.rotation_euler.z=math.radians(-25)
 
 print('Jeep ready', flush=True)
 # Yellow single-engine floatplane, +Y Blender / -Z browser nose.
 plane=empty('PlaneRoot')
-ellipsoid('Floatplane fuselage',(0,1.6,0),(.74,.8,3.8),M['yellow'],plane)
-ellipsoid('Engine cowling',(0,1.6,-3.1),(.78,.77,.82),M['yellow'],plane)
+# Lofted utility-aircraft body: broad cabin and a narrow rising tail, with a
+# short radial cowling rather than the original oversized spherical nose.
+verts=[];faces=[];N=24
+stations=[(-2.9,.65,.63,1.6),(-1.3,.68,.68,1.6),(.5,.65,.66,1.6),(1.6,.42,.44,1.7),(3.3,.14,.17,1.9),(3.7,.08,.10,1.9)]
+for z,rx,ry,y in stations:
+    for i in range(N):
+        a=math.tau*i/N;verts.append((rx*math.cos(a),y+ry*math.sin(a),z))
+for j in range(len(stations)-1):
+    for i in range(N):faces.append((j*N+i,j*N+(i+1)%N,(j+1)*N+(i+1)%N,(j+1)*N+i))
+faces.extend([tuple(reversed(range(N))),tuple(range((len(stations)-1)*N,len(stations)*N))])
+body=mesh('Tapered floatplane fuselage',verts,faces,M['yellow'],plane)
+for f in body.data.polygons:f.use_smooth=len(f.vertices)==4
+beam('Radial engine cowling',(0,1.6,-3.65),(0,1.6,-2.65),.69,M['yellow'],plane,40)
+ellipsoid('Rounded cowling front',(0,1.6,-3.65),(.69,.69,.18),M['yellow'],plane)
+ring('Cowling front seam',(0,1.6,-3.69),.65,.018,M['black'],plane,axis='Z')
 ellipsoid('Cockpit glass',(0,2.04,-.6),(.68,.64,1.08),M['glass'],plane)
-box('High wing',(0,2.7,-.15),(12.8,.19,1.95),M['yellow'],.10,plane)
+# Closed airfoil profile, tapered outer wing and thin trailing edge.
+def airfoil(name,span,chord,y,z,material,parent):
+    verts=[];faces=[];N=24
+    for x,c,dy in [(-span/2,.83,.12),(-span*.42,1,.02),(0,1,0),(span*.42,1,.02),(span/2,.83,.12)]:
+        for i in range(N):
+            a=math.tau*i/N;u=(1-math.cos(a))/2
+            thickness=.12*chord*(.2969*math.sqrt(max(u,0))-.126*u-.3516*u*u+.2843*u**3-.1036*u**4)/.2
+            verts.append((x,y+dy+(.018*chord*math.sin(math.pi*u))+(1 if i<N/2 else -1)*thickness*c,z+(u-.5)*chord*c))
+    for j in range(4):
+        for i in range(N):faces.append((j*N+i,j*N+(i+1)%N,(j+1)*N+(i+1)%N,(j+1)*N+i))
+    faces.extend([tuple(reversed(range(N))),tuple(range(4*N,5*N))])
+    o=mesh(name,verts,faces,material,parent)
+    for f in o.data.polygons:f.use_smooth=len(f.vertices)==4
+    return o
+airfoil('Cambered high wing',12.8,1.95,2.7,-.15,M['yellow'],plane)
 box('Tailplane',(0,1.9,2.8),(4.6,.14,1.2),M['yellow'],.08,plane)
 mesh('Vertical stabilizer',[(-.06,1.75,2.6),(-.06,4,3),(-.06,4,3.65),(-.06,1.75,3.7),(.06,1.75,2.6),(.06,4,3),(.06,4,3.65),(.06,1.75,3.7)],[(0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3)],M['yellow'],plane)
 for x in [-1.3,1.3]:
@@ -230,20 +378,58 @@ for x in [-.73,.73]:
 prop=empty('Propeller');prop.parent=plane;prop.location=v((0,1.6,-4))
 box('Propeller blade',(0,0,0),(.14,2.9,.09),M['black'],.06,prop)
 ellipsoid('Spinner',(0,1.6,-4.03),(.21,.21,.3),M['silver'],plane)
+# Cockpit framing, control surfaces and twin pontoon rigging.
+for x in [-.59,.59]:
+    beam('Cockpit windshield frame',(x,1.95,-1.55),(x*.8,2.55,-.95),.035,M['black'],plane)
+    beam('Cockpit top frame',(x*.8,2.55,-.95),(x,2.45,.25),.035,M['black'],plane)
+    beam('Cockpit rear frame',(x,2.45,.25),(x,1.95,.45),.035,M['black'],plane)
+    beam('Cockpit door sill',(x,1.95,-1.55),(x,1.95,.45),.035,M['yellow'],plane)
+    beam('Cockpit middle frame',(x,1.95,-.2),(x,2.5,-.2),.028,M['yellow'],plane)
+    box('Plane seat',(x*.55,1.94,-.5),(.40,.15,.50),M['fabric'],.05,plane)
+    box('Plane seat back',(x*.55,2.17,-.05),(.4,.5,.12),M['black'],.04,plane)
+for x in [-1.3,1.3]:
+    box('Pontoon nonslip deck',(x,.45,-.15),(.36,.045,3.8),M['black'],.04,plane)
+    beam('Pontoon outer seam',(x+.30,.19,-2.3),(x+.30,.19,2.1),.018,M['silver'],plane)
+    for z in [-1.3,.8]:
+        beam('Float crossbeam',(-1.3,.47,z),(1.3,.47,z),.04,M['silver'],plane)
+        beam('Float diagonal wire',(x,.48,z),(x*.25,1.30,z+.5),.014,M['black'],plane,6)
+    box('Water rudder',(x,-.12,2.65),(.07,.55,.38),M['black'],.03,plane)
+    beam('Water rudder linkage',(x,.42,2.3),(x,-.12,2.65),.025,M['silver'],plane)
+for sign in [-1,1]:
+    beam('Aileron hinge',(sign*3,2.72,.57),(sign*5.8,2.8,.55),.012,M['black'],plane,6)
+    beam('Wing leading seam',(sign*.8,2.72,-1.1),(sign*5.4,2.75,-1.1),.012,M['silver'],plane,6)
+    beam('Wing second brace',(sign*.6,1.35,-.9),(sign*5.2,2.65,-.7),.035,M['silver'],plane)
+    beam('Tail brace',(sign*.35,1.6,2),(sign*1.9,1.92,2.9),.018,M['silver'],plane,8)
+beam('Windscreen center',(0,2.1,-1.6),(0,2.63,-1),.025,M['yellow'],plane)
+beam('Engine exhaust',(.56,1.3,-3.2),(.85,1.1,-3),.075,M['black'],plane)
+beam('Antenna',(0,2.35,1),(0,3,1.2),.015,M['black'],plane,6)
 plane.location=v((-25,.14,14));plane.rotation_euler.z=math.radians(80)
 
 print('Plane ready', flush=True)
-# Optimize static meshes into material batches. Hero parts remain individually editable.
-static=[o for o in bpy.context.scene.objects if o.type=='MESH' and not o.parent]
+# Meter-scaled box-projected UVs for the runtime timber PBR maps. Directly
+# allocated meshes need explicit coordinates; joined material batches retain them.
+for o in bpy.context.scene.objects:
+    if o.type!='MESH' or o.data.uv_layers:continue
+    uv=o.data.uv_layers.new(name='UVMap')
+    for f in o.data.polygons:
+        axis=max(range(3),key=lambda a:abs(f.normal[a]))
+        axes=([1,2] if axis==0 else [0,2] if axis==1 else [0,1])
+        for li in f.loop_indices:
+            p=o.data.vertices[o.data.loops[li].vertex_index].co
+            uv.data[li].uv=(p[axes[0]]*.18,p[axes[1]]*.18)
+
+# Batch material geometry within each transform root. Wheel pivots and propeller
+# stay separate, while the hero objects cost tens rather than hundreds of draws.
 groups={}
-for o in static:
-    key=o.data.materials[0].name if len(o.data.materials)==1 else o.name
+for o in list(bpy.context.scene.objects):
+    if o.type!='MESH':continue
+    key=(o.parent.name if o.parent else 'Landscape',o.data.materials[0].name if len(o.data.materials)==1 else o.name)
     groups.setdefault(key,[]).append(o)
-for name,objs in groups.items():
+for (parent_name,name),objs in groups.items():
     if len(objs)<2:continue
     bpy.ops.object.select_all(action='DESELECT')
     for o in objs:o.select_set(True)
-    bpy.context.view_layer.objects.active=objs[0];bpy.ops.object.join();objs[0].name='Landscape / '+name
+    bpy.context.view_layer.objects.active=objs[0];bpy.ops.object.join();objs[0].name=parent_name+' / '+name
 
 # Lighting and camera are retained in editable source, runtime supplies its own sky/water.
 bpy.ops.object.light_add(type='SUN',location=(-30,-20,45));sun=bpy.context.object;sun.name='Golden hour sun';sun.data.energy=3.2;sun.data.angle=.12;sun.rotation_euler=(math.radians(28),math.radians(-24),math.radians(-35))
@@ -260,5 +446,6 @@ for o in bpy.context.scene.objects:
     if o.type in ('MESH','EMPTY') and o!=water:o.select_set(True)
 bpy.ops.export_scene.gltf(filepath=os.path.join(ROOT,'assets','northbound.glb'),export_format='GLB',use_selection=True,export_yup=True,export_apply=True,export_cameras=False,export_lights=False)
 water.hide_set(False)
-bpy.context.scene.render.filepath=os.path.join(ROOT,'assets','blender-progress.png');bpy.ops.render.render(write_still=True)
+if os.environ.get('CABIN_RENDER')=='1':
+    bpy.context.scene.render.filepath=os.path.join(ROOT,'assets','blender-progress.png');bpy.ops.render.render(write_still=True)
 print('CABIN_SCENE_DONE',len(bpy.context.scene.objects))
