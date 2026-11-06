@@ -1,5 +1,6 @@
 import {WATERCOURSE,streamCenter} from './waterfall-bridge.js';
 import * as THREE from 'three';
+import {createCanopyTexture} from './forest-canopy.js';
 import {WORLD,LAKE,DRIVEWAY,lakeRadius,roadOffset,roadPoint,TUNNEL} from './engine.js';
 
 export const FOREST_LOD=Object.freeze({chunkSize:384,detailStart:160,detailEnd:220,fadeStart:1400,cullDistance:1900});
@@ -137,6 +138,10 @@ export function createForest(heightAt,roadRadius){
     return m;
   }
   const detailMaterial=withFade(material,'detail'),cardMaterial=withFade(material.clone(),'card');
+  // Whole-crown cards previously reused the branch spray and became bright,
+  // triangular fern cutouts. Crown-specific alpha and baked branch occlusion
+  // provide volume at distance without adding geometry or render passes.
+  cardMaterial.map=createCanopyTexture();cardMaterial.alphaTest=.38;
   const trunkMaterial=withFade(bark,'detail');
   // Shadows fade with the detailed crowns, rather than surviving their LOD swap.
   const crownDepth=withFade(new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,map:needles,alphaTest:.28,side:THREE.DoubleSide}),'detail');

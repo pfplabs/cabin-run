@@ -69,7 +69,7 @@ const fields=`
  float lmRough=clamp(.85+(lmLarge.a-.5)*.14+(lmFine.a-.5)*.08*lmDetail,.72,.97);
 `;
 function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:114},relief=1}={}){
- material.customProgramCacheKey=()=>`northbound-landscape-v2-${terrain?'terrain':'rock'}`;
+ material.customProgramCacheKey=()=>`northbound-landscape-v3-${terrain?'terrain':'rock'}`;
  material.userData.landscapeSurface={kind:terrain?'terrain':'rock',worldUnits:'metres',externalTextures:grassMap?1:0};
  material.onBeforeCompile=shader=>{
   shader.uniforms.lmSurface={value:shared()};shader.uniforms.lmRelief={value:relief};
@@ -92,6 +92,13 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
     vec3 lmGrassA=texture2D(lmGrass,lmUV).rgb;
     vec3 lmGrassB=texture2D(lmGrass,mat2(.8,-.6,.6,.8)*vLMWorld.xz/11.+vec2(.31,.67)).rgb;
     vec3 lmGrassColour=mix(lmGrassA,lmGrassB,.28)*mix(.93,1.08,lmLarge.r);
+    // Broad meadow communities interrupt the uniform lawn at valley scale.
+    // Reuse the packed surface sampler: one extra lookup, no texture allocation.
+    vec4 lmMeadow=texture2D(lmSurface,vLMWorld.xz/145.+vec2(.17,.63));
+    float lmDry=smoothstep(.43,.73,lmMeadow.r);
+    float lmGrassLuma=dot(lmGrassColour,vec3(.2126,.7152,.0722));
+    lmGrassColour=mix(lmGrassColour,vec3(lmGrassLuma)*vec3(1.12,1.05,.82),.20+lmDry*.28);
+    lmGrassColour*=mix(vec3(.76,.83,.74),vec3(1.04,1.0,.86),lmMeadow.b);
     // Texture-only grass detail remains subtle; mineral shader supplies relief.
     float lmSlope=1.-abs(normalize(vLMWorldNormal).y);
     float lmRockMask=smoothstep(.12,.46,lmSlope+(lmLarge.r-.5)*.14);
@@ -100,7 +107,7 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
     float lmShoreDistance=(lmLakeRadius-1.)*min(lmLake.z,lmLake.w);
     float lmShore=(1.-smoothstep(2.05,7.4,lmShoreDistance))*
       (1.-smoothstep(1.5,4.,vLMWorld.y));
-    float lmSoil=smoothstep(.57,.78,lmLarge.r)*.28*(1.-lmRockMask);
+    float lmSoil=smoothstep(.53,.75,lmLarge.r)*(.16+lmDry*.45)*(1.-lmRockMask);
     vec3 lmSoilColour=vec3(.25,.22,.165)*(1.+(lmFine.g-.5)*.1*lmDetail);
     vec3 lmSandColour=mix(vec3(.22,.215,.18),vec3(.43,.405,.32),smoothstep(-.05,.85,vLMWorld.y));
     vec3 lmGround=mix(lmGrassColour,lmSoilColour,lmSoil);

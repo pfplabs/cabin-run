@@ -2,6 +2,16 @@
 
 ## Mac mini refinement check — 2026-11-06
 
+Follow-up forest/meadow pass: replaced branch-texture reuse on distant tree cards
+with an independently seeded 512×1024 whole-crown spruce texture, preserving tree
+placement RNG, geometry, chunking and LOD. Broader meadow colour and dry-soil
+variation reuse the packed terrain sampler (one additional lookup). 119 tests
+passed after the final changes. Chrome compiled and rendered the scene without
+console errors; gameplay screenshot saved as `evidence/forest-meadow-gameplay.jpg`
+outside the repository. Browser camera/viewport changed concurrently during the
+review, so no controlled FPS comparison is claimed. No road/terrain geometry or
+collision changes were made in this follow-up.
+
 - Isolated checkout based on `8bf7e14`, served on `http://127.0.0.1:4183/?qa=1`.
 - 119 tests passed, including tunnel volume/camera clearance, watertight rock shells, three lake apertures, flat cabin terrain, and a new glass-only shadow regression. glTF inspection passed: 60 meshes, 143,234 triangles, 29 materials.
 - Chrome loaded the revised scene, started gameplay and switched cameras. No console errors were recorded. Existing `PCFSoftShadowMap` deprecation warning remains.
