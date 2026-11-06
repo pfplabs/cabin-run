@@ -19,7 +19,7 @@ import {applyHeroMaterials} from './hero-materials.js';
 import {applyVehicleFidelity} from './vehicle-fidelity.js';
 import {applyJeepBody} from './jeep-body.js?v=cockpit-anchor-1';
 import {applyPlaneBody} from './plane-body.js';
-import {createRoadSigns} from './road-signs.js';
+import {createRoadSigns} from './road-signs.js?v=us-signs-1';
 import {createForest} from './foliage.js';
 import {createForestGrass} from './forest-grass.js';
 import {createCabinGrounding} from './cabin-grounding.js';
