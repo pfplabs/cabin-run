@@ -23,12 +23,15 @@ test('jeep cabin, shoreline and outer boundaries stop motion',()=>{
 test('collision notices are rate limited',()=>{
  const s=running();Object.assign(s,{x:-4.6,z:-10,heading:Math.PI/2,speed:14});E.update(s,{up:true},.05);s.speed=14;E.update(s,{up:true},.05);assert.equal(s.events.length,1);
 });
-test('plane takes off, climbs, descends, banks, brakes and stays bounded',()=>{
- const s=running('plane');step(s,{},3.1);assert.ok(s.y>11);s.x=0;s.z=E.WORLD.centerZ;step(s,{up:true},1);assert.ok(s.y>17);
- s.x=0;s.z=E.WORLD.centerZ;s.y=E.WORLD.flightCeiling-1;step(s,{up:true},1);near(s.y,E.WORLD.flightCeiling);s.x=0;s.z=E.WORLD.centerZ;s.y=2;step(s,{down:true},.1);near(s.y,1.7);
- const heading=s.heading;step(s,{right:true,brake:true},.3);assert.ok(s.heading>heading);assert.ok(s.roll<0);assert.ok(s.speed<15);
- Object.assign(s,{x:E.WORLD.roadRadius*1.13-.2,z:E.WORLD.centerZ,y:20,heading:Math.PI/2,speed:27});step(s,{},1);assert.ok(E.roadRadius(s.x,s.z)<=1.14);assert.ok(s.x<E.WORLD.roadRadius*1.13-.2);
- Object.assign(s,{x:0,z:E.WORLD.flightNorthLimit+.1,heading:0,y:20});step(s,{},.1);assert.ok(s.z>=E.WORLD.flightNorthLimit);
+test('plane accelerates on water before lifting, with smoothed pitch and bank',()=>{
+ const s=running('plane');near(s.speed,0);near(s.y,E.FLIGHT.waterHeight);assert.equal(s.onWater,true);
+ step(s,{up:true},2);near(s.speed,0);near(s.y,E.FLIGHT.waterHeight);
+ E.update(s,{boost:true,up:true,right:true},.02);assert.ok(s.throttle>0&&s.throttle<.01);assert.ok(s.propRPM>E.FLIGHT.idleRPM);assert.ok(s.yawRate<.01);
+ step(s,{boost:true,up:true},6);assert.ok(s.speed>10);assert.ok(s.y>E.FLIGHT.waterHeight+1);assert.equal(s.onWater,false);
+ const before={pitch:s.pitch,vertical:s.verticalSpeed,heading:s.heading};E.update(s,{down:true,left:true},.02);
+ assert.ok(Math.abs(s.pitch-before.pitch)<.03);assert.ok(Math.abs(s.verticalSpeed-before.vertical)<.6);assert.ok(Math.abs(s.heading-before.heading)<.02);
+ s.x=0;s.z=E.WORLD.centerZ;s.y=E.WORLD.flightCeiling-.1;step(s,{up:true},1);near(s.y,E.WORLD.flightCeiling);
+ s.x=0;s.z=E.WORLD.centerZ;s.y=.4;s.verticalSpeed=-2;s.pitch=-.3;step(s,{down:true},.3);near(s.y,E.FLIGHT.waterHeight);assert.equal(s.onWater,true);
 });
 test('plane avoids low shoreline and cabin terrain',()=>{
  const s=running('plane');Object.assign(s,{x:-E.LAKE.rx-12,z:E.WORLD.centerZ,y:1.7,takeoff:0});E.update(s,{},.02);assert.ok(s.y>=6);
@@ -37,7 +40,7 @@ test('plane avoids low shoreline and cabin terrain',()=>{
 test('dock interaction moors, holds still, then takes off',()=>{
  const s=running('plane');assert.equal(E.action(s),false);Object.assign(s,{x:E.DOCK.x,z:E.DOCK.z,y:10,takeoff:0});E.update(s,{},.02);assert.equal(s.actionReady,true);
  assert.equal(E.action(s),true);assert.equal(s.parked,true);near(s.x,E.DOCK.x);near(s.z,E.DOCK.z);const pos=[s.x,s.y,s.z];step(s,{up:true,right:true},2);assert.deepEqual([s.x,s.y,s.z],pos);
- assert.equal(E.action(s),true);assert.equal(s.parked,false);step(s,{},.5);assert.ok(s.y>pos[1]);
+ assert.equal(E.action(s),true);assert.equal(s.parked,false);near(s.speed,0);step(s,{},.5);near(s.y,pos[1]);step(s,{boost:true,up:true},6);assert.ok(s.y>pos[1]);
 });
 test('switching resets vehicle-specific state and restart resets session',()=>{
  const s=running();step(s,{up:true},.5);s.arrived=true;assert.equal(E.switchVehicle(s,'plane'),true);assert.equal(s.phase,'plane');assert.equal(s.arrived,false);near(s.elapsed,.5);
@@ -59,13 +62,17 @@ test('road and driveway are drivable continuously from spawn to cabin',()=>{
  assert.ok(!s.events.some(e=>e.type==='bump'),'Route should not require any collision');
 });
 
-test('floatplane can fly from its launch point to the cabin dock',()=>{
- const s=running('plane');
- for(let i=0;i<1000&&!s.actionReady;i++){
-  const target=Math.atan2(E.DOCK.x-s.x,s.z-E.DOCK.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));
-  E.update(s,{left:error<-.01,right:error>.01},.02);
+test('floatplane flies to cabin dock using throttle, pitch and steering inputs',()=>{
+ const s=running('plane');let maxAltitude=0;
+ for(let i=0;i<2500&&!s.actionReady;i++){
+  const distance=Math.hypot(E.DOCK.x-s.x,E.DOCK.z-s.z),target=Math.atan2(E.DOCK.x-s.x,s.z-E.DOCK.z);
+  const error=Math.atan2(Math.sin(target-s.heading-s.yawRate*.6),Math.cos(target-s.heading-s.yawRate*.6));
+  const throttle=distance<60?.32:.7,predicted=s.y+s.verticalSpeed*.8;
+  E.update(s,{boost:s.throttle<throttle-.01,brake:s.throttle>throttle+.01,up:predicted<7.5,down:predicted>8.5,left:error<-.025,right:error>.025},.02);
+  maxAltitude=Math.max(maxAltitude,s.y);
  }
- assert.equal(s.actionReady,true);assert.equal(s.events.length,0);assert.equal(E.action(s),true);assert.equal(s.parked,true);
+ assert.ok(maxAltitude>5,'Must actually take off rather than taxi the route');
+ assert.equal(s.actionReady,true,JSON.stringify(s));assert.equal(s.events.length,0);assert.equal(E.action(s),true);assert.equal(s.parked,true);
 });
 
 test('expanded lake has four times the original area and preserves cabin landmarks',()=>{
@@ -79,10 +86,12 @@ test('larger world preserves jeep and floatplane speed limits',()=>{
   const s=running();for(let i=0;i<1000;i++){s.x=-E.WORLD.roadRadius;s.z=E.WORLD.centerZ;E.update(s,input,.02);}
   near(s.speed,limit);
  }
- for(const [input,limit] of [[{},17],[{boost:true},27],[{brake:true},9]]){
-  const s=running('plane');for(let i=0;i<1000;i++){s.x=0;s.z=E.WORLD.centerZ;E.update(s,input,.02);}
-  near(s.speed,limit);
- }
+ const plane=running('plane');
+ for(let i=0;i<2500;i++){plane.x=0;plane.z=E.WORLD.centerZ;E.update(plane,{boost:true},.02);assert.ok(plane.speed<=27);}
+ near(plane.speed,27,1e-6);near(plane.throttle,1);near(plane.propRPM,E.FLIGHT.maxRPM,1e-5);
+ const throttle=plane.throttle;step(plane,{},.1);near(plane.throttle,throttle);
+ for(let i=0;i<2500;i++){plane.x=0;plane.z=E.WORLD.centerZ;E.update(plane,{brake:true},.02);}
+ near(plane.speed,0,1e-6);near(plane.throttle,0);near(plane.propRPM,E.FLIGHT.idleRPM,1e-5);
 });
 
 function follow(s,points){
@@ -121,4 +130,36 @@ test('driveway levels and terrain road shoulder are continuous',()=>{
  for(const p of E.DRIVEWAY.slice(1))near(E.terrainHeight(p.x,p.z),p.y);
  const a=.2,p=E.roadPoint(a);for(const offset of [-5,5])near(E.terrainHeight(p.x+Math.sin(a)*offset,p.z-Math.cos(a)*offset),p.y);
  const s=running();Object.assign(s,E.roadPoint(-.4),{heading:Math.atan2(E.roadPoint(-.399).x-E.roadPoint(-.4).x,E.roadPoint(-.4).z-E.roadPoint(-.399).z)});E.update(s,{},.02);assert.ok(s.pitch>.05);
+});
+
+test('plane boundary warns, permits manual return and resets countdown',()=>{
+ const s=running('plane'),b=E.FLIGHT_BOUNDARY;
+ Object.assign(s,{x:E.WORLD.roadRadius*(b.warningRadius+.01),z:E.WORLD.centerZ,y:30,onWater:false,heading:Math.PI/2,speed:16,throttle:.6});
+ E.update(s,{},.02);assert.equal(s.boundaryStatus,'warning');
+ s.x=E.WORLD.roadRadius*(b.normalRadius+.01);const heading=s.heading;step(s,{},.5);
+ assert.equal(s.boundaryStatus,'outside');near(s.heading,heading);assert.ok(s.boundaryRemaining<b.returnSeconds);
+ for(let i=0;i<700&&s.boundaryStatus==='outside';i++)E.update(s,{left:true},.02);
+ assert.ok(['inside','warning'].includes(s.boundaryStatus),JSON.stringify(s));near(s.boundaryRemaining,b.returnSeconds);
+});
+test('plane boundary recovers gently after timeout or far excursion and stays bounded',()=>{
+ const b=E.FLIGHT_BOUNDARY;
+ for(const initial of [{x:E.WORLD.roadRadius*1.2,z:E.WORLD.centerZ,boundaryRemaining:.05},{x:E.WORLD.roadRadius*(b.graceRadius+.01),z:E.WORLD.centerZ},{x:0,z:b.graceNorth-1}]){
+  const s=running('plane');Object.assign(s,{y:40,onWater:false,heading:Math.PI/2,throttle:.65,speed:16},initial);
+  let recovered=false;
+  for(let i=0;i<1600;i++){
+   const heading=s.heading;E.update(s,{},.02);assert.ok(Math.abs(s.heading-heading)<=.65*.02+1e-9,'No forced 180-degree heading snap');
+   assert.ok(E.roadRadius(s.x,s.z)<=b.hardRadius+1e-8);assert.ok(s.z>=b.hardNorth);assert.ok(s.y<=E.WORLD.flightCeiling);
+   recovered ||= s.boundaryStatus==='recovering';
+   if(recovered&&['inside','warning'].includes(s.boundaryStatus))break;
+  }
+  assert.ok(recovered);assert.ok(['inside','warning'].includes(s.boundaryStatus),JSON.stringify(s));
+ }
+});
+test('flight dynamic state resets on switching, mooring and restart',()=>{
+ const s=running('plane');step(s,{boost:true,up:true,right:true},5);assert.ok(s.throttle>0);E.switchVehicle(s,'jeep');
+ for(const k of ['throttle','propRPM','verticalSpeed','yawRate'])near(s[k],0);
+ E.switchVehicle(s,'plane');near(s.speed,0);assert.equal(s.onWater,true);near(s.throttle,0);
+ Object.assign(s,{actionReady:true,throttle:.7,propRPM:2200,verticalSpeed:3,yawRate:.4});E.action(s);
+ assert.equal(s.parked,true);for(const k of ['throttle','propRPM','verticalSpeed','yawRate'])near(s[k],0);
+ E.begin(s,'plane');assert.equal(s.parked,false);assert.equal(s.boundaryStatus,'inside');near(s.throttle,0);
 });

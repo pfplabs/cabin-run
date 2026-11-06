@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {CameraRig} from './camera-rig.js';
 import {CameraObstruction} from './camera-collision.js';
+import {createTerrainMaterial,createRockMaterial} from './landscape-materials.js';
+import {createFlightBarrier,createPropellerBlur} from './flight-effects.js';
 import {HDRLoader} from 'three/addons/loaders/HDRLoader.js';
 import {Water} from './vendor/Water.js';
 import * as E from './engine.js';
@@ -71,21 +73,7 @@ water.material.fragmentShader=water.material.fragmentShader
 const landHeight=landscapeHeight;
 const grass=surfaceMap('grasslight-big.jpg',{color:true,repeat:[180,180]});
 const groundGeo=createLandscapeGeometry();
-const terrainMaterial=new THREE.MeshStandardMaterial({map:grass,vertexColors:true,roughness:1,metalness:0,color:0xffffff});
-// World-space macro variation breaks repeating grass; steep slopes expose stone.
-terrainMaterial.onBeforeCompile=shader=>{
- shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vTerrain; varying vec3 vTerrainNormal;').replace('#include <begin_vertex>','#include <begin_vertex>\nvTerrain=position;vTerrainNormal=normal;');
- shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vTerrain; varying vec3 vTerrainNormal;');
- shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
- float macro=sin(vTerrain.x*.037+sin(vTerrain.z*.041)*2.)*sin(vTerrain.z*.026);
- diffuseColor.rgb*=.96+macro*.06;
- float slope=1.-abs(normalize(vTerrainNormal).y);
- float rock=smoothstep(.2,.55,slope)*smoothstep(12.,38.,vTerrain.y);
- float grain=.5+.5*sin(vTerrain.x*1.7+sin(vTerrain.z*2.1))*sin(vTerrain.y*2.8);
- vec3 stone=mix(vec3(.25,.27,.25),vec3(.43,.45,.41),grain);
- diffuseColor.rgb=mix(diffuseColor.rgb,stone,rock);
- `);
-};
+const terrainMaterial=createTerrainMaterial({grassMap:grass,lake:E.LAKE});
 const ground=new THREE.Mesh(groundGeo,terrainMaterial);ground.receiveShadow=true;const tunnel=createMountainTunnel();scene.add(ground,createLakeDetails(),createSandbar(),tunnel,createParkingLot());
 tunnel.updateMatrixWorld(true);tunnel.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
 const asphaltMaterial=new THREE.MeshStandardMaterial({...createAsphaltMaps(),color:0xffffff});
@@ -112,27 +100,16 @@ for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),x=p.x+5*Math.sin
 scene.add(createForest(landHeight,E.roadRadius));
 let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
 
-let jeep,plane,propeller,wheels=[],ready=false,visual=0,mode='chase',sound=false,audioCtx,osc,gain;
+const flightBarrier=createFlightBarrier();scene.add(flightBarrier);
+let jeep,plane,propeller,propellerBlur,wheels=[],ready=false,visual=0,mode='chase',sound=false,audioCtx,osc,gain;
 const keys=new Set(),held=new Map();let last=0,toastLife=0,updateClock=0;
 const woodMaps={map:surfaceMap('hardwood2_diffuse.jpg',{color:true,flipY:false}),bumpMap:surfaceMap('hardwood2_bump.jpg',{flipY:false}),roughnessMap:surfaceMap('hardwood2_roughness.jpg',{flipY:false})};
-// Small world-space mineral variation adds scale to the existing granite shapes.
-function graniteMaterial(m){
- m.roughness=.92;
- m.onBeforeCompile=shader=>{
-  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vStone;').replace('#include <begin_vertex>','#include <begin_vertex>\nvStone=(modelMatrix*vec4(position,1.)).xyz;');
-  shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vStone;');
-  shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
-   float mineral=fract(sin(dot(floor(vStone*35.),vec3(12.9898,78.233,37.719)))*43758.5453);
-   float strata=sin(vStone.x*3.+vStone.y*5.+sin(vStone.z*4.));
-   diffuseColor.rgb*=.72+.30*mineral+.10*strata;
-  `);
- };
-}
 new GLTFLoader().load('./assets/northbound.glb',gltf=>{
- scene.add(gltf.scene);gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];for(let i=0;i<mats.length;i++){let m=mats[i];if(/cedar|deck|timber/i.test(m.name)){Object.assign(m,woodMaps);m.color.set(/deck/i.test(m.name)?0x968575:0xd1b395);m.bumpScale=.045;m.roughness=.82;m.needsUpdate=true;}if(/glazing/i.test(m.name)){const glass=new THREE.MeshPhysicalMaterial({name:m.name,color:0xb3c4c3,roughness:.095,metalness:0,transmission:.30,thickness:.12,ior:1.5,transparent:true,opacity:.88,envMapIntensity:1.35,side:THREE.DoubleSide});mats[i]=glass;}if(/Granite/i.test(m.name))graniteMaterial(m);if(/jeep paint|Floatplane yellow/i.test(m.name)){const paint=new THREE.MeshPhysicalMaterial();THREE.MeshStandardMaterial.prototype.copy.call(paint,m);paint.clearcoat=.55;paint.clearcoatRoughness=.22;paint.roughness=.35;mats[i]=paint;}if(/Aluminium/i.test(m.name)){m.metalness=.92;m.roughness=.29;}}o.material=Array.isArray(o.material)?mats:mats[0];if(/Meadow terrain|Gravel track/.test(o.name)||/Meadow|Interior shadow|Pine needles|Sunlit needles|Pine bark/.test(mats[0]?.name)||/Gravel road/.test(mats[0]?.name))o.visible=false;}
+ scene.add(gltf.scene);gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];for(let i=0;i<mats.length;i++){let m=mats[i];if(/cedar|deck|timber/i.test(m.name)){Object.assign(m,woodMaps);m.color.set(/deck/i.test(m.name)?0x968575:0xd1b395);m.bumpScale=.045;m.roughness=.82;m.needsUpdate=true;}if(/glazing/i.test(m.name)){const glass=new THREE.MeshPhysicalMaterial({name:m.name,color:0xb3c4c3,roughness:.095,metalness:0,transmission:.30,thickness:.12,ior:1.5,transparent:true,opacity:.88,envMapIntensity:1.35,side:THREE.DoubleSide});mats[i]=glass;}if(/Granite/i.test(m.name)){const stone=createRockMaterial();stone.name=m.name;mats[i]=stone;}if(/jeep paint|Floatplane yellow/i.test(m.name)){const paint=new THREE.MeshPhysicalMaterial();THREE.MeshStandardMaterial.prototype.copy.call(paint,m);paint.clearcoat=.55;paint.clearcoatRoughness=.22;paint.roughness=.35;mats[i]=paint;}if(/Aluminium/i.test(m.name)){m.metalness=.92;m.roughness=.29;}}o.material=Array.isArray(o.material)?mats:mats[0];if(/Meadow terrain|Gravel track/.test(o.name)||/Meadow|Interior shadow|Pine needles|Sunlit needles|Pine bark/.test(mats[0]?.name)||/Gravel road/.test(mats[0]?.name))o.visible=false;}
  });
  jeep=gltf.scene.getObjectByName('JeepRoot');plane=gltf.scene.getObjectByName('PlaneRoot');propeller=gltf.scene.getObjectByName('Propeller');wheels=['LeftFront','LeftRear','RightFront','RightRear'].map(n=>gltf.scene.getObjectByName('JeepWheel'+n)).filter(Boolean);
  if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
+ if(propeller){propellerBlur=createPropellerBlur();propeller.add(propellerBlur);}
  gltf.scene.updateMatrixWorld(true);gltf.scene.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o;while(p){if(p===jeep||p===plane)return;p=p.parent;}cameraObstacles.push(o);});
  for(const x of [-.75,.75]){const lamp=new THREE.SpotLight(0xffedca,95,38,.43,.6,2);lamp.position.set(x,1.1,-2);const target=new THREE.Object3D();target.position.set(x,.4,-19);jeep.add(target,lamp);lamp.target=target;}
 
@@ -148,10 +125,14 @@ function start(){if(!ready)return;E.begin(state);mode='chase';$('#camera').inner
 function pause(){if(!['running','paused'].includes(state.status))return;E.togglePause(state);clearInput();cameraRig.setEnabled(state.status==='running');if(state.status==='paused'){
   $('#title').innerHTML='Stay a<br>little longer.';$('#description').textContent='Your drive or flight is paused. The lake can wait.';$('#start').innerHTML='Back to the lake <span>↗</span>';$('#restart').classList.remove('hidden');$('#steps').classList.add('hidden');$('#overlay').classList.remove('hidden');document.body.classList.add('intro-open');$('#pause').textContent='▶';$('#pause').setAttribute('aria-label','Resume game');
  }else{$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();}}
-function switchVehicle(){if(!ready||state.status!=='running')return;E.switchVehicle(state,state.phase==='jeep'?'plane':'jeep');clearInput();mode='chase';$('#camera').innerHTML='Orbit <b>C</b>';cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='plane'?'A / D steer · W climb · S descend · Space to moor near the dock.':'W / S throttle and reverse · A / D steer · Shift to accelerate.');}
+function switchVehicle(){if(!ready||state.status!=='running')return;E.switchVehicle(state,state.phase==='jeep'?'plane':'jeep');clearInput();mode='chase';$('#camera').innerHTML='Orbit <b>C</b>';cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='plane'?'Hold Shift to add throttle, then W to lift off. Control lowers throttle; A / D turn.':'W / S throttle and reverse · A / D steer · Shift to accelerate.');}
 function changeCamera(){if(!ready)return;mode=mode==='chase'?'orbit':mode==='orbit'?'cabin':'chase';cameraRig.setMode(mode,state);$('#camera').innerHTML=(mode==='chase'?'Orbit':mode==='orbit'?'Wide orbit':'Cabin')+' <b>C</b>';}
 function formatTime(t){return String(Math.floor(t/60)).padStart(2,'0')+':'+(t%60).toFixed(1).padStart(4,'0');}
-function sync(){const flying=state.phase==='plane';$('#vehicle').textContent=flying?'YELLOW FLOATPLANE':'4 × 4 JEEP';$('#time').textContent=formatTime(state.elapsed);$('#metric-label').textContent=flying?'ALTITUDE':'SPEED';$('#metric').innerHTML=flying?Math.round(state.y)+' <small>m</small>':Math.round(Math.abs(state.speed)*3.6)+' <small>km/h</small>';$('#switch').innerHTML=(flying?'Drive jeep':'Fly plane')+' <b>V</b>';$('#chapter').textContent=flying?'02 / ABOVE THE LAKE':'01 / THE MOUNTAIN ROAD';$('#objective').innerHTML=flying?'Find your<br>way home.':'Take the long<br>way home.';$('#instructions').textContent=flying?'Fly toward the lakeside cabin. Climb and descend with W / S. Slow down near the dock and press Space to moor.':'Follow the winding lakeside road over the ridge and through the tunnel. The gravel side road leads to three marked cabin parking bays.';$('#checklist').innerHTML=flying?'<div><span>↟</span> Destination <b>Cabin dock</b></div><div><span>↗</span> Safe altitude <b>2–84 m</b></div>':'<div><span>↟</span> Destination <b>North shore</b></div><div><span>↻</span> Scenic road <b>1.21 km</b></div>';$('#controls-copy').innerHTML=flying?'<b>W S</b> climb & descend <b>A D</b> steer <b>SHIFT</b> boost':'<b>W S</b> throttle & reverse <b>A D</b> steer <b>SHIFT</b> accelerate';$('#interact').classList.toggle('hidden',!state.actionReady&&!state.parked);$('#interact').innerHTML=(state.parked?'Take off again':flying?'Moor at the dock':'Park by the cabin')+' <span>SPACE</span>';$('#touch-action').textContent=state.parked?'TAKE OFF':flying?'MOOR':'PARK';$('#touch-action').disabled=!state.actionReady&&!state.parked;}
+function sync(){const flying=state.phase==='plane';$('#vehicle').textContent=flying?'YELLOW FLOATPLANE':'4 × 4 JEEP';$('#time').textContent=formatTime(state.elapsed);$('#metric-label').textContent=flying?'ALTITUDE':'SPEED';$('#metric').innerHTML=flying?Math.round(state.y)+' <small>m</small>':Math.round(Math.abs(state.speed)*3.6)+' <small>km/h</small>';$('#switch').innerHTML=(flying?'Drive jeep':'Fly plane')+' <b>V</b>';$('#chapter').textContent=flying?'02 / ABOVE THE LAKE':'01 / THE MOUNTAIN ROAD';$('#objective').innerHTML=flying?'Find your<br>way home.':'Take the long<br>way home.';$('#instructions').textContent=flying?'Hold Shift to add throttle, then W to lift off. Release holds engine power. Control reduces throttle; W / S pitch and A / D bank. Slow below 47 km/h near the dock to moor.':'Follow the winding lakeside road over the ridge and through the tunnel. The gravel side road leads to three marked cabin parking bays.';$('#checklist').innerHTML=flying?'<div><span>↟</span> Airspeed <b>'+Math.round(state.speed*3.6)+' km/h</b></div><div><span>↗</span> Throttle <b>'+Math.round((state.throttle||0)*100)+'%</b></div><div><span>◉</span> Engine <b>'+Math.round(state.propRPM||0)+' RPM</b></div>':'<div><span>↟</span> Destination <b>North shore</b></div><div><span>↻</span> Scenic road <b>1.21 km</b></div>';$('#controls-copy').innerHTML=flying?'<b>W S</b> pitch <b>A D</b> bank <b>SHIFT / CTRL</b> throttle':'<b>W S</b> throttle & reverse <b>A D</b> steer <b>SHIFT</b> accelerate';$('#interact').classList.toggle('hidden',!state.actionReady&&!state.parked);$('#interact').innerHTML=(state.parked?'Take off again':flying?'Moor at the dock':'Park by the cabin')+' <span>SPACE</span>';$('#touch-action').textContent=state.parked?'TAKE OFF':flying?'MOOR':'PARK';$('#touch-action').disabled=!state.actionReady&&!state.parked;
+ $('[data-control=boost]').textContent=flying?'THR +':'BOOST';$('[data-control=brake]').textContent=flying?'THR −':'BRAKE';
+ const warning=flying&&state.status==='running'&&state.boundaryStatus!=='inside';$('#boundary-notice').classList.toggle('hidden',!warning);document.body.classList.toggle('flight-limit',warning);
+ if(warning)$('#boundary-notice').textContent=state.boundaryStatus==='warning'?'Valley boundary ahead · Turn toward the lake':state.boundaryStatus==='outside'?'Outside the valley · Return in '+Math.ceil(state.boundaryRemaining)+'s':'Turning back toward the lake · Steering assist active';
+}
 $('#start').addEventListener('click',()=>state.status==='paused'?pause():start());$('#restart').addEventListener('click',start);$('#pause').addEventListener('click',pause);$('#switch').addEventListener('click',switchVehicle);$('#camera').addEventListener('click',changeCamera);$('#interact').addEventListener('click',()=>E.action(state));$('#touch-action').addEventListener('click',()=>E.action(state));
 $('#sound').addEventListener('click',()=>{sound=!sound;$('#sound').textContent=sound?'Sound on':'Sound off';$('#sound').setAttribute('aria-pressed',String(sound));if(sound&&!audioCtx){audioCtx=new AudioContext();osc=audioCtx.createOscillator();gain=audioCtx.createGain();osc.type='triangle';osc.connect(gain);gain.connect(audioCtx.destination);gain.gain.value=0;osc.start();}if(audioCtx)audioCtx.resume();});
 const aliases={w:'up',ArrowUp:'up',s:'down',ArrowDown:'down',a:'left',ArrowLeft:'left',d:'right',ArrowRight:'right',Shift:'boost',Control:'brake'};
@@ -172,14 +153,15 @@ function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;visual+=dt;cons
    const parked=state.phase==='jeep'?plane:jeep;parked.position.set(...(state.phase==='jeep'?[-25,.15,14]:[-16,1.1,-9]));parked.rotation.set(0,state.phase==='jeep'?1.4:3.6,0);
    cameraRig.setEnabled(state.status==='running');cameraRig.update(state,dt);
   }
-  if(propeller)propeller.rotation.z+=dt*(state.phase==='plane'&&!state.parked?state.speed*5:1);
+  if(propeller){const rpm=state.phase==='plane'&&!state.parked?(state.propRPM||0):0;if(state.status==='running')propeller.rotation.z=(propeller.rotation.z+dt*rpm*Math.PI*2/60)%(Math.PI*2);if(propellerBlur){propellerBlur.material.uniforms.amount.value=THREE.MathUtils.clamp((rpm-700)/1500,0,1);propellerBlur.material.uniforms.phase.value=propeller.rotation.z*.27;}}
   if(state.phase==='jeep'&&state.status==='running')for(const wheel of wheels){wheel.rotation.order='YXZ';wheel.rotation.x-=state.speed*dt/.588;if(wheel.name.includes('Front'))wheel.rotation.y=-((input.right?1:0)-(input.left?1:0))*.28;}
  }
  water.material.uniforms.time.value+=dt*.55;
+ flightBarrier.visible=state.phase==='plane'&&state.status==='running'&&state.boundaryStatus!=='inside';flightBarrier.material.uniforms.strength.value=state.boundaryStatus==='warning'?.7:1;flightBarrier.material.uniforms.outside.value=state.boundaryStatus==='warning'?0:1;flightBarrier.material.uniforms.time.value=visual;
  for(const ev of state.events.splice(0))toast(ev.text);toastLife-=dt;if(toastLife<=0)$('#toast').classList.remove('visible');
  updateClock+=dt;if(updateClock>.1){sync();updateClock=0;}
  const target=state.phase==='jeep'?E.HOME:E.DOCK,point=new THREE.Vector3(target.x,6,target.z).project(camera);const visible=point.z<1&&Math.abs(point.x)<.94&&Math.abs(point.y)<.92;$('#waypoint').style.opacity=visible?'1':'0';$('#waypoint').style.left=(point.x*.5+.5)*innerWidth+'px';$('#waypoint').style.top=(-point.y*.5+.5)*innerHeight+'px';$('#waypoint-label').textContent=state.phase==='jeep'?'The cabin':'Floatplane dock';$('#waypoint-distance').textContent=Math.round(Math.hypot(target.x-state.x,target.z-state.z))+' m';
- if(audioCtx){const running=sound&&state.status==='running'&&!state.parked;gain.gain.setTargetAtTime(running?.022:0,audioCtx.currentTime,.15);osc.frequency.setTargetAtTime(state.phase==='plane'?55+state.speed*3:35+Math.abs(state.speed)*8,audioCtx.currentTime,.1);}
+ if(audioCtx){const running=sound&&state.status==='running'&&!state.parked;gain.gain.setTargetAtTime(running?.022:0,audioCtx.currentTime,.15);osc.frequency.setTargetAtTime(state.phase==='plane'?30+(state.propRPM||0)/18:35+Math.abs(state.speed)*8,audioCtx.currentTime,.1);}
  const lightTarget=state.status==='ready'||mode==='cabin'?new THREE.Vector3(0,2,-7):new THREE.Vector3(state.x,state.y,state.z);sun.target.position.lerp(lightTarget,Math.min(1,dt*2));sun.position.copy(sun.target.position).addScaledVector(sunDirection,110);
  renderer.render(scene,camera);requestAnimationFrame(frame);
 }requestAnimationFrame(frame);

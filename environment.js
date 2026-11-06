@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createRockMaterial,createGraniteGeometry} from './landscape-materials.js';
 import {LAKE,WORLD,terrainHeight,roadPoint,TUNNEL,PARKING} from './engine.js';
 
 const smooth=(a,b,x)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
@@ -59,16 +60,12 @@ export function createLakeDetails(){
  const group=new THREE.Group();group.name='Shoreline detail';let seed=1986;
  const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
  const transform=new THREE.Object3D(),color=new THREE.Color();
- const rockGeometry=new THREE.IcosahedronGeometry(1,2),vertices=rockGeometry.attributes.position;
- for(let i=0;i<vertices.count;i++){
-  const x=vertices.getX(i),y=vertices.getY(i),z=vertices.getZ(i),f=1+.11*Math.sin(x*8+z*4)*Math.cos(y*7);
-  vertices.setXYZ(i,x*f,y*f,z*f);
- }rockGeometry.computeVertexNormals();
- const rocks=new THREE.InstancedMesh(rockGeometry,new THREE.MeshStandardMaterial({color:0x777d77,roughness:.87,metalness:0}),330);
+ const rockGeometry=createGraniteGeometry({detail:3});
+ const rocks=new THREE.InstancedMesh(rockGeometry,createRockMaterial(),330);
  for(let i=0;i<330;i++){
   const a=random()*Math.PI*2,r=.997+random()*.035,x=LAKE.rx*r*Math.sin(a),z=LAKE.z-LAKE.rz*r*Math.cos(a),s=.24+random()**2*1.8;
   transform.position.set(x,Math.max(-.22,landscapeHeight(x,z))-.15,z);transform.rotation.set(random()*.5,random()*6.28,random()*.4);transform.scale.set(s*(1+random()*.7),s*.55,s*(.7+random()*.5));transform.updateMatrix();rocks.setMatrixAt(i,transform.matrix);
-  color.setHSL(.11,.035+random()*.055,.22+random()*.2);rocks.setColorAt(i,color);
+  color.setHSL(.11,.018+random()*.025,.80+random()*.16);rocks.setColorAt(i,color);
  }rocks.castShadow=rocks.receiveShadow=true;group.add(rocks);
  // Individual curved blades make reeds and grasses three-dimensional from any view.
  const p=[],ix=[];
@@ -133,11 +130,7 @@ export function createMountainTunnel(){
   }
  }
  function shell(positions,material){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();const o=new THREE.Mesh(g,material);o.castShadow=o.receiveShadow=true;group.add(o);return o;}
- const rock=new THREE.MeshStandardMaterial({color:0x858a80,roughness:.97,side:THREE.DoubleSide});
- rock.onBeforeCompile=s=>{s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vRock;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRock=position;');s.fragmentShader=s.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vRock;').replace('#include <color_fragment>',`#include <color_fragment>
-  float grains=fract(sin(dot(floor(vRock*17.),vec3(12.9,78.2,37.7)))*43758.5);
-  diffuseColor.rgb*=.80+.30*grains+.06*sin(vRock.x*2.1+vRock.y*3.8);
- `);};
+ const rock=createRockMaterial();
  shell(inner,rock);shell(outer,rock);
  for(const j of [0,rings])for(let i=0;i<count-1;i++){
   const a=(j*count+i)*3,b=a+3;
@@ -145,9 +138,8 @@ export function createMountainTunnel(){
  }
  const capGeometry=new THREE.BufferGeometry();capGeometry.setAttribute('position',new THREE.Float32BufferAttribute(portals,3));capGeometry.computeVertexNormals();const caps=new THREE.Mesh(capGeometry,rock);caps.castShadow=caps.receiveShadow=true;group.add(caps);
  // Irregular rock shoulders join the shell into a ridge instead of a freestanding arch.
- const outcropGeometry=new THREE.IcosahedronGeometry(1,2),outcropPositions=outcropGeometry.attributes.position;
- for(let i=0;i<outcropPositions.count;i++){const x=outcropPositions.getX(i),y=outcropPositions.getY(i),z=outcropPositions.getZ(i),r=1+.08*Math.sin(x*7+y*3)*Math.cos(z*8);outcropPositions.setXYZ(i,x*r,y*r,z*r);}outcropGeometry.computeVertexNormals();
- const outcrops=new THREE.InstancedMesh(outcropGeometry,new THREE.MeshStandardMaterial({color:0x7c8177,roughness:1}),12),placement=new THREE.Object3D();
+ const outcropGeometry=createGraniteGeometry();
+ const outcrops=new THREE.InstancedMesh(outcropGeometry,createRockMaterial(),12),placement=new THREE.Object3D();
  for(let j=0;j<6;j++)for(let side of [-1,1]){
   const a=THREE.MathUtils.lerp(TUNNEL.startAngle,TUNNEL.endAngle,j/5),c=roadPoint(a),distance=17+Math.sin(j*2.4)*1.2;
   placement.position.set(c.x+Math.sin(a)*distance*side,c.y+1.7,c.z-Math.cos(a)*distance*side);placement.rotation.set(.12*Math.sin(j),-a,.1*side);placement.scale.set(9.8,8.8+Math.sin(j*1.7),12.5);placement.updateMatrix();outcrops.setMatrixAt(j*2+(side>0?1:0),placement.matrix);

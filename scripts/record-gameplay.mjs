@@ -28,9 +28,9 @@ while(waypoint<route.length&&Date.now()<deadline){
 }
 await page.evaluate(()=>cabinQA.input.clear());if(waypoint<route.length)throw new Error('Road sequence did not reach the cabin. Inspect recorded gameplay instead of claiming success.');
 await page.keyboard.press('Space');await page.screenshot({path:path.join(out,'02-jeep-at-cabin.png')});await page.waitForTimeout(1500);
-await page.keyboard.press('v');const flightDeadline=Date.now()+20000;
+await page.keyboard.press('v');const flightDeadline=Date.now()+60000;
 while(Date.now()<flightDeadline){
- const ready=await page.evaluate(dock=>{const s=cabinQA.state,p=dock,target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));cabinQA.input.clear();if(error<-.015)cabinQA.input.add('left');if(error>.015)cabinQA.input.add('right');return s.actionReady;},DOCK);
+ const ready=await page.evaluate(dock=>{const s=cabinQA.state,distance=Math.hypot(dock.x-s.x,dock.z-s.z),target=Math.atan2(dock.x-s.x,s.z-dock.z),error=Math.atan2(Math.sin(target-s.heading-s.yawRate*.6),Math.cos(target-s.heading-s.yawRate*.6));const throttle=distance<60?.32:.7,predicted=s.y+s.verticalSpeed*.8;cabinQA.input.clear();if(s.throttle<throttle-.01)cabinQA.input.add('boost');if(s.throttle>throttle+.01)cabinQA.input.add('brake');if(predicted<7.5)cabinQA.input.add('up');if(predicted>8.5)cabinQA.input.add('down');if(error<-.025)cabinQA.input.add('left');if(error>.025)cabinQA.input.add('right');return s.actionReady;},DOCK);
  if(ready)break;await page.waitForTimeout(50);
 }
 await page.evaluate(()=>cabinQA.input.clear());await page.screenshot({path:path.join(out,'03-plane-approach.png')});await page.keyboard.press('Space');

@@ -5,3 +5,5 @@
 @media(max-height:620px){#mission{top:80px;padding:12px}#mission p,.checklist{display:none}#hud{bottom:62px}h1{font-size:52px;margin:14px 0}.intro{padding-top:46px}#description{margin-bottom:12px}#steps{margin:15px 0}.fine{margin-top:12px}#overlay{padding-left:7vw}.primary{padding:13px 20px}#touch{bottom:10px}#hud{left:auto;bottom:120px}#mission{width:185px}}
 
 .credits{position:absolute;right:36px;bottom:7px;font-size:8px;color:#afc0b5;text-decoration:none;opacity:.8}.credits:hover{text-decoration:underline}@media(max-width:600px){.credits{right:20px;bottom:3px;font-size:7px}}
+
+#boundary-notice{position:absolute;top:100px;left:50%;transform:translateX(-50%);max-width:85vw;padding:12px 20px;border:1px solid #e5b37299;border-radius:6px;background:#182b32ed;color:#ffe0ac;font-size:12px;line-height:1.4;text-align:center;pointer-events:none}#boundary-vignette{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 90px #dc7f3844;transition:opacity .5s}body.flight-limit #boundary-vignette{opacity:1}@media(max-width:600px){#boundary-notice{top:83px;width:88vw;font-size:11px}body.flight-limit #mission{opacity:.15}}

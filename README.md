@@ -18,15 +18,15 @@ python3 -m http.server 4173
 ## Explore
 
 - Jeep: W/S or arrows for throttle and reverse, A/D or arrows to steer, Shift to accelerate, Control to brake.
-- Floatplane: A/D steers, W climbs, S descends, Shift boosts, Control slows.
+- Floatplane starts idling on the water. Hold Shift to raise throttle, then W to lift off once moving. Control lowers throttle; release holds the chosen power. A/D banks and steers, W/S changes pitch smoothly. The HUD shows throttle, airspeed and engine RPM.
 - V switches between the jeep road start and floatplane lake start. This is a convenient scene selector, not an in-world boarding interaction.
-- Space parks near the house, moors the plane near the dock, or takes off after mooring.
+- Space parks near the house, moors the plane near the dock below 47 km/h, or releases it from its mooring. After release, throttle up and lift off again.
 - C cycles close orbit, wide orbit and fixed cabin cameras. Drag to orbit either vehicle, scroll to zoom, or use one-finger orbit and two-finger pinch on touch screens. The close camera smoothly follows steering while preserving your relative orbit angle. Wide orbit stays world-relative. Horizontal/diagonal two-finger trackpad swipes rotate, pinch zooms, and Shift+scroll is an explicit orbit fallback. The camera ducks and moves closer inside the tunnel, then restores your chosen distance.
 - P or Escape pauses. Losing focus pauses the simulation and clears held controls.
 - On-screen multi-touch driving/flight controls are provided for small/coarse-pointer screens.
 - Sound is opt-in. No accounts, analytics, tracking, remote assets or gameplay network calls. Texture credits are linked in the scene and documented in `assets/pbr/SOURCES.md`.
 
-The expanded lake has four times the original surface area (312 × 228 metres across). A winding, roughly 1.2 km road climbs the rocky ridge, passes through a genuine open-ended tunnel, and descends around the lake. A separate gravel driveway reaches three usable parking bays beside the cabin. A sandy bar and reeds soften the rocky shoreline. The world is bounded by the valley; flight has an 84 m altitude ceiling. There are no crates, rings, races or imposed objectives.
+The expanded lake has four times the original surface area (312 × 228 metres across). A winding, roughly 1.2 km road climbs the rocky ridge, passes through a genuine open-ended tunnel, and descends around the lake. A separate gravel driveway reaches three usable parking bays beside the cabin. A sandy bar and reeds soften the rocky shoreline. The world is bounded by the valley; flight has an 84 m altitude ceiling. A translucent edge appears near the flight limit. Leaving it shows an eight-second return countdown; manual return is allowed before a gentle steering assist engages. There are no crates, rings, races or imposed objectives.
 
 ## Rebuild the Blender assets
 
@@ -46,15 +46,15 @@ npm test
 node scripts/inspect-scene.mjs
 ```
 
-The 28 Node tests cover driving, flight, boundaries, collision, pause/resume/restart, vehicle switching, a complete winding road circuit through the tunnel, continuous input-driven trips to the cabin and dock, camera gestures, terrain mesh normals and tunnel geometry. Scene validation parses the real GLB with Three.js, checks named vehicle roots, finite geometry and triangle/draw-call budgets.
+The 46 Node tests cover driving, flight, boundaries, collision, pause/resume/restart, vehicle switching, a complete winding road circuit through the tunnel, continuous input-driven trips to the cabin and dock, camera gestures, terrain mesh normals and tunnel geometry. Scene validation parses the real GLB with Three.js, checks named vehicle roots, finite geometry and triangle/draw-call budgets.
 
 `?qa=1` enables `window.cabinQA` for deterministic test setup. `window.cabinDiagnostics()` is read-only and reports scene/renderer/simulation details. Normal play does not expose state-changing debug controls.
 
 ## Art and verification status
 
-This is an evolving 3D reconstruction, not a claim of photorealistic parity with the modern reference rendering. Modeling, textured materials, lighting and vegetation remain iterative. `assets/northbound.blend` is the editable source, not a gameplay capture. The browser scene adds live reflections, photographed HDR sky/lighting, PBR timber maps, photographic grass, textured 3D needle branches, physical glass, clearcoat paint and procedural mineral detail. These are a material/lighting pass; geometry and visual tuning remain unfinished.
+This is an evolving 3D reconstruction, not a claim of photorealistic parity with the modern reference rendering. Modeling, textured materials, lighting and vegetation remain iterative. `assets/northbound.blend` is the editable source, not a gameplay capture. The browser scene adds live reflections, photographed HDR sky/lighting, PBR timber maps, photographic grass, textured 3D needle branches, physical glass, clearcoat paint and procedural mineral detail. Terrain now layers grass, soil, shoreline and exposed rock; granite uses metre-scale weathering, mineral detail, roughness and surface-normal variation. These procedural materials and smoother decorative boulders remain an art iteration, not photorealistic parity.
 
-The previous iteration was rendered and driven in a real Mac browser, including jeep and aircraft controls, pause, switching and boundary recovery. The expanded world, new models and gesture controls pass automated checks, but their integrated appearance, touch behavior and frame rate still need a fresh browser pass. The cloud browser disables WebGL, so it cannot supply that verification. See `QA.md`. Never describe a Blender preview as captured gameplay.
+The previous iteration was rendered and driven in a real Mac browser, including jeep and aircraft controls, pause, switching and boundary recovery. The expanded world was played by the user. The latest camera corrections, new flight dynamics and material shaders pass automated checks, but their integrated appearance, touch behavior and frame rate still need a fresh browser pass. The cloud browser disables WebGL, so it cannot supply that verification. See `QA.md`. Never describe a Blender preview as captured gameplay.
 
 ## Third-party software
 
