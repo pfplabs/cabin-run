@@ -1,3 +1,4 @@
+import {explorationAt} from './engine.js';
 import {WATERCOURSE,streamCenter} from './waterfall-bridge.js';
 import * as THREE from 'three';
 import {createCanopyTexture} from './forest-canopy.js';
@@ -73,6 +74,7 @@ export function createForest(heightAt,roadRadius){
   function valid(x,z,spacing){
     
     if(z>WATERCOURSE.mouthZ&&z<WATERCOURSE.headZ+10&&Math.abs(x-streamCenter(z))<14)return false;
+    if(explorationAt(x,z).distance<7)return false;
     if(Math.abs(roadOffset(x,z))<14||lakeRadius(x,z)<1+8.5/LAKE.rz)return false;
     const angle=Math.atan2(x,WORLD.centerZ-z);if(angle>TUNNEL.startAngle-.04&&angle<TUNNEL.endAngle+.04&&Math.abs(roadOffset(x,z))<29)return false;
     // Cabin, terrace and apron remain clear. No stand blocks the access lane.

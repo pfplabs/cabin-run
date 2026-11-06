@@ -3,7 +3,7 @@ import {shorelineScale} from './shoreline.js';
 import * as THREE from 'three';
 import {createRockMaterial,createGraniteGeometry} from './landscape-materials.js';
 import {clipRibbonOutsideRoad,createGravelMaterial} from './road-surfaces.js';
-import {LAKE,WORLD,terrainHeight,mountainHeight,backdropHeight,waterfallHill,lakeRadius,roadOffset,roadPoint,TUNNEL,PARKING,PARKING_APRON,DRIVEWAY} from './engine.js';
+import {LAKE,WORLD,terrainHeight,mountainHeight,backdropHeight,waterfallHill,lakeRadius,roadOffset,roadPoint,TUNNEL,PARKING,PARKING_APRON,DRIVEWAY,EXPLORATION_ROUTES} from './engine.js';
 
 const smooth=(a,b,x)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 export function landscapeHeight(x,z){
@@ -25,7 +25,7 @@ export function landscapeHeight(x,z){
 /** Shore-focused annular topology keeps the water edge smooth without a huge grid. */
 export function createLandscapeGeometry(){
  // Keep fine angular samples around the cabin; the distant shore needs half as many.
- const angularSteps=1920,angles=[];for(let i=0;i<=angularSteps;i++){const a=i/angularSteps*Math.PI*2,wrapped=Math.atan2(Math.sin(a),Math.cos(a));if(i%6===0||(wrapped>-.8&&wrapped<.16)||(wrapped>.38&&wrapped<2.95&&i%3===0))angles.push(a);}
+ const angularSteps=1920,angles=[];for(let i=0;i<=angularSteps;i++){const a=i/angularSteps*Math.PI*2,wrapped=Math.atan2(Math.sin(a),Math.cos(a));if((i%3===0&&EXPLORATION_ROUTES.some(r=>Math.abs(wrapped-r.angle)<.045))||i%6===0||(wrapped>-.8&&wrapped<.16)||(wrapped>.38&&wrapped<2.95&&i%3===0))angles.push(a);}
  const segments=angles.length-1,positions=[],uvs=[],colors=[],indices=[];
  const sections=[],shoreOuter=1+3.99/LAKE.rz;
  for(const r of [0,.88,.94,1-3.42/LAKE.rz,1-1.71/LAKE.rz,1,1+1.71/LAKE.rz,shoreOuter])sections.push({kind:'lake',r});

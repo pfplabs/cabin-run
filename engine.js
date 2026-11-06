@@ -1,3 +1,4 @@
+import {createExplorationRoutes,explorationSample} from './exploration-routes.js';
 import {advanceFlightDynamics} from './flight-dynamics.js';
 import {shorelineScale} from './shoreline.js';
 /** Pure simulation rules for a small bounded alpine lake. Distances are metres. */
@@ -56,6 +57,8 @@ export function onParkingApron(x,z){const p=PARKING_APRON,qx=Math.max(Math.abs(x
 export const PARKING=[{x:-16,z:-16,width:4.6,length:7},{x:-16,z:-9,width:4.6,length:7},{x:-16,z:-2,width:4.6,length:7}];
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function lakeBoundaryPoint(a){const r=shorelineScale(a);return {x:LAKE.rx*r*Math.sin(a),z:LAKE.z-LAKE.rz*r*Math.cos(a)};}
+export const EXPLORATION_ROUTES=createExplorationRoutes(roadPoint,lakeBoundaryPoint);
+export const explorationAt=(x,z)=>explorationSample(EXPLORATION_ROUTES,x,z);
 export const lakeRadius=(x,z)=>Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz)/shorelineScale(Math.atan2(x/LAKE.rx,(LAKE.z-z)/LAKE.rz));
 export const roadLength=()=>{let length=0,p=roadPoint(0);for(let i=1;i<=2048;i++){const q=roadPoint(i/2048*Math.PI*2);length+=Math.hypot(q.x-p.x,q.z-p.z,q.y-p.y);p=q;}return length;};
 export const roadRadius=(x,z)=>Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius);
@@ -65,6 +68,8 @@ export function terrainHeight(x,z){
  const base=1.1+.12*Math.sin(x*.15)*Math.cos(z*.12);
  const ridge=1-smooth((offset-6)/(highRoad(a)>0?Math.max(42,routeHeight(a)*1.3):42));
  let height=base+(routeHeight(a)-base)*ridge;
+ // Level the additional lakeside deceleration pockets and feather their shoulder.
+ for(const stop of EXPLORATION_ROUTES){if(a>stop.angle-.145&&a<stop.angle+.06&&station.offset<0){const w=(1-smooth((offset-9)/5))*smooth((a-(stop.angle-.145))/.015)*(1-smooth((a-stop.angle-.04)/.02));height+=(station.y-height)*w;}}
  // Flatten the driveway center and softly blend its shoulders into the ridge.
  let distance=Infinity,driveHeight=height;
  for(let i=1;i<DRIVEWAY.length;i++){
@@ -75,6 +80,8 @@ export function terrainHeight(x,z){
  }
  const blend=(1-smooth((distance-4)/7.5))*smooth((offset-6)/6);
  height+=(driveHeight-height)*blend;
+ const spur=explorationAt(x,z);
+ if(spur.distance<9){const weight=(1-smooth(Math.max(0,spur.distance)/9))*smooth((offset-9)/4);height+=(spur.height-height)*weight;}
  // A level forecourt joins the straight aisle and perpendicular parking bays.
  const apronDistance=Math.hypot(Math.max(-31-x,0,x+11),Math.max(-22-z,0,z-4));
  height+=(1.1-height)*(1-smooth(apronDistance/2));
@@ -110,7 +117,7 @@ export function backdropHeight(x,z){
  return .65*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22));
 }
 export const waterfallHill=(x,z)=>62*Math.exp(-Math.pow(x/75,2)-Math.pow((z-1020)/80,2));
-export function fresh(){return {status:'ready',phase:'jeep',x:-16,y:terrainHeight(-16,-9),z:-9,heading:-.45,speed:0,pitch:0,roll:0,elapsed:0,cooldown:0,events:[],actionReady:false,takeoff:0,parked:false,arrived:false,...flightState(),...jeepState()}}
+export function fresh(){return {status:'ready',phase:'jeep',x:-16,y:terrainHeight(-16,-9),z:-9,heading:-.45,speed:0,pitch:0,roll:0,elapsed:0,cooldown:0,events:[],visitedStops:[],actionReady:false,takeoff:0,parked:false,arrived:false,...flightState(),...jeepState()}}
 export function begin(s,vehicle='jeep'){Object.assign(s,fresh(),{status:'running'});switchVehicle(s,vehicle);}
 export function togglePause(s){if(s.status==='running')s.status='paused';else if(s.status==='paused')s.status='running';}
 export function switchVehicle(s,vehicle){
@@ -199,6 +206,7 @@ function updateJeep(s,input,steer,dt){
   s.speed=0;s.acceleration=0;s.yawRate=0;
  }else{s.x=nx;s.z=nz;}
  dampSuspension(s,dt);
+ for(const stop of EXPLORATION_ROUTES){if(Math.hypot(s.x-stop.end.x,s.z-stop.end.z)<stop.turnRadius&&Math.abs(s.speed)<3&&!s.visitedStops.includes(stop.id)){s.visitedStops.push(stop.id);s.events.push({type:'discovery',text:stop.description});}}
  s.actionReady=Math.hypot(s.x-HOME.x,s.z-HOME.z)<6;
  if(s.actionReady&&!s.arrived){s.arrived=true;s.events.push({type:'home',text:'You made it home. The lake is yours to explore.'});}
 }

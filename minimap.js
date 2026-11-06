@@ -25,8 +25,8 @@ export function createMinimap({ size = 192, createCanvas = () => document.create
   const element = createCanvas(), backdrop = createCanvas();
   element.className = 'lake-minimap';
   element.setAttribute('role', 'img');
-  element.setAttribute('aria-label', 'North-up lake map. Gold arrow shows your vehicle and direction. H marks home, D marks dock.');
-  element.textContent = 'North-up lake map: gold arrow is your vehicle; H is home; D is dock.';
+  element.setAttribute('aria-label', 'North-up lake map. Gold arrow shows your vehicle and direction. H home, D dock, V overlook, C cove, P picnic clearing.');
+  element.textContent = 'North-up lake map: gold arrow is your vehicle; H home; D dock; V overlook; C cove; P picnic clearing.';
   for (const canvas of [element, backdrop]) { canvas.width = size * 2; canvas.height = size * 2; }
   const ctx = element.getContext('2d'), bg = backdrop.getContext('2d');
   if (!ctx || !bg) return { element, canvas: element, update: () => false };
@@ -51,6 +51,7 @@ export function createMinimap({ size = 192, createCanvas = () => document.create
   bg.strokeStyle = '#74a3ac'; bg.lineWidth = 1; bg.stroke();
   path(road, true); bg.strokeStyle = '#a4b7a4'; bg.lineWidth = 2; bg.stroke();
   if (world.DRIVEWAY) { path(world.DRIVEWAY); bg.strokeStyle = '#90a18c'; bg.lineWidth = 1; bg.stroke(); }
+  for(const stop of world.EXPLORATION_ROUTES){path(stop.points);bg.strokeStyle='#d3bd8c';bg.lineWidth=1.5;bg.stroke();const p=project(stop.end);bg.fillStyle='#f3d6a0';bg.font='bold 9px system-ui, sans-serif';bg.fillText(stop.mapLabel,p.x+3,p.y-3);}
   const highlight = (start, end, color) => {
     const points = Array.from({ length: 20 }, (_, i) => world.roadPoint(start + (end - start) * i / 19));
     path(points); bg.strokeStyle = color; bg.lineWidth = 3; bg.stroke();

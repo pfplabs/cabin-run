@@ -1,3 +1,4 @@
+import {explorationAt} from './engine.js';
 import * as THREE from 'three';
 import {LAKE, DRIVEWAY, CABIN_BOUNDS, PARKING_APRON, lakeRadius, roadOffset} from './engine.js';
 import {WATERCOURSE, streamCenter} from './waterfall-bridge.js';
@@ -6,6 +7,7 @@ export const GRASS = Object.freeze({chunkSize:32, fadeStart:38, distance:85, tuf
 const segmentDistance=(x,z,a,b)=>{const dx=b.x-a.x,dz=b.z-a.z;const t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);return Math.hypot(x-a.x-t*dx,z-a.z-t*dz);};
 // Include blade width and maximum wind displacement in clearance margins.
 export function grassAllowed(x,z,heightAt){
+ if(explorationAt(x,z).distance<7)return false;
  if(Math.abs(roadOffset(x,z))<10 || lakeRadius(x,z)<1+3/LAKE.rz)return false;
  if(DRIVEWAY.some((b,i)=>i&&segmentDistance(x,z,DRIVEWAY[i-1],b)<6))return false;
  const p=PARKING_APRON,c=CABIN_BOUNDS;

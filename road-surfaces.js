@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {terrainHeight,roadOffset,DRIVEWAY,onParkingApron} from './engine.js';
+import {terrainHeight,explorationAt,roadOffset,DRIVEWAY,onParkingApron} from './engine.js';
 
 /** Dense stations make the road follow the same terrain used by the tyres. */
 export function createRoadRibbonGeometry(points,width,{offset=.08,spacing=1,heightAt=terrainHeight}={}){
@@ -19,6 +19,7 @@ export function createRoadRibbonGeometry(points,width,{offset=.08,spacing=1,heig
 }
 export {createGravelMaterial} from './gravel-material.js';
 export function isGravel(x,z){
+ if(explorationAt(x,z).distance<=0&&Math.abs(roadOffset(x,z))>4.2)return true;
  let driveDistance=Infinity;
  for(let i=1;i<DRIVEWAY.length;i++){const a=DRIVEWAY[i-1],b=DRIVEWAY[i],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);driveDistance=Math.min(driveDistance,Math.hypot(x-a.x-t*dx,z-a.z-t*dz));}
  if(driveDistance<2.25)return false;
