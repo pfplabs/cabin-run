@@ -47,8 +47,8 @@ class CanvasInput {
 }
 
 export class CameraRig {
- constructor(camera,canvas,{heightAt=()=>-3,resolveCamera=null}={}) {
-  this.camera=camera;this.canvas=canvas;this.heightAt=heightAt;this.resolveCamera=resolveCamera;
+ constructor(camera,canvas,{heightAt=()=>-3,resolveCamera=null,applyCockpit=null}={}) {
+  this.applyCockpit=applyCockpit;this.exteriorNear=camera.near;this.camera=camera;this.canvas=canvas;this.heightAt=heightAt;this.resolveCamera=resolveCamera;
   // Input owns this unconstrained pose. Collision correction only changes camera.
   this.desiredCamera=camera.clone();this.lastState=null;this.headingFollow=0;this.lastTrackpad=-Infinity;
   this.offset=new Vector3();this.up=new Vector3(0,1,0);this.spherical=new Spherical();
@@ -68,12 +68,12 @@ export class CameraRig {
   this.controls.mouseButtons={LEFT:MOUSE.ROTATE,MIDDLE:MOUSE.DOLLY,RIGHT:MOUSE.ROTATE};
   this.controls.touches={ONE:TOUCH.ROTATE,TWO:TOUCH.DOLLY_ROTATE};
   this.controls.target.copy(this.target);this._limits();
-  this.controls.enabled=this.enabled&&this.mode!=='cabin';
+  this.controls.enabled=this.enabled&&!['cabin','cockpit'].includes(this.mode);
   this.controls.update();
-  this.controls.addEventListener('change',()=>{if(this.initialized&&!this.updating&&this.mode!=='cabin')this._render(0);});
+  this.controls.addEventListener('change',()=>{if(this.initialized&&!this.updating&&!['cabin','cockpit'].includes(this.mode))this._render(0);});
  }
  _wheel(event){
-  if(!this.enabled||this.mode==='cabin')return false;
+  if(!this.enabled||['cabin','cockpit'].includes(this.mode))return false;
   // Browsers expose wheel deltas, not reliable trackpad/mouse identification.
   // Horizontal pixel scrolling begins an orbit gesture; its vertical tail stays
   // orbit for 250 ms. Ctrl-wheel pinch and normal vertical wheel remain zoom.
@@ -98,8 +98,9 @@ export class CameraRig {
   this.controls.maxDistance=this.mode==='orbit'?200:this.phase==='plane'?100:50;
  }
  _target(state){return this.delta.set(state.x,state.y+(state.phase==='plane'?1.8:2),state.z);}
- _cabin(){this.camera.position.set(-49,24,55);this.camera.lookAt(0,4,-7);}
+ _cabin(){this.applyCockpit?.(this.camera,this.lastState,false);this.camera.position.set(-49,24,55);this.camera.lookAt(0,4,-7);}
  _render(dt=0){
+  if(this.applyCockpit?.(this.camera,this.lastState,this.mode==='cockpit'))return;
   this.camera.position.copy(this.desiredCamera.position);
   const p=this.camera.position,h=this.heightAt(p.x,p.z);
   if(Number.isFinite(h))p.y=Math.max(p.y,.6,h+1.2);
@@ -120,9 +121,10 @@ export class CameraRig {
   if(this.mode==='cabin')this._cabin();else this._render();
  }
  setMode(mode,state){
-  if(!['chase','orbit','cabin'].includes(mode))throw new RangeError(`Unknown camera mode: ${mode}`);
+  if(!['chase','orbit','cockpit','cabin'].includes(mode))throw new RangeError(`Unknown camera mode: ${mode}`);
   if(this.disposed)return;
   const previous=this.mode;this.mode=mode;
+  this.camera.near=mode==='cockpit'?.04:this.exteriorNear;this.camera.updateProjectionMatrix();
   if(!this.initialized||previous==='cabin'){this.reset(state);return;}
   this._rebuild();
   if(mode==='cabin')this._cabin();else this.update(state,0);
@@ -138,6 +140,7 @@ export class CameraRig {
   if(!this.initialized||state.phase!==this.phase)this.reset(state);
   if(this.mode==='cabin'){this._cabin();return;}
   this.lastState=state;
+  if(this.mode==='cockpit'){this._render(dt);return;}
   this._target(state).sub(this.target);
   this.desiredCamera.position.add(this.delta);this.controls.target.add(this.delta);
   this.target.copy(this.controls.target);

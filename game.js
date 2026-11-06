@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import {createFrameMetrics} from './frame-metrics.js';
 import {createRenderQuality,isSettingsInput} from './render-quality.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {CockpitCamera} from './cockpit-camera.js';
 import {CameraRig} from './camera-rig.js';
 import {CameraObstruction} from './camera-collision.js';
 import {createTerrainMaterial,createRockMaterial} from './landscape-materials.js';
@@ -109,9 +110,10 @@ new GLTFLoader().load('./assets/northbound.glb',gltf=>{
  applyVehicleFidelity(gltf.scene);
  applyJeepBody(gltf.scene);
  applyPlaneBody(gltf.scene);
- renderQuality.register(gltf.scene);
  jeep=gltf.scene.getObjectByName('JeepRoot');plane=gltf.scene.getObjectByName('PlaneRoot');propeller=gltf.scene.getObjectByName('Propeller');wheels=['LeftFront','LeftRear','RightFront','RightRear'].map(n=>gltf.scene.getObjectByName('JeepWheel'+n)).filter(Boolean);
  if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
+ const cockpitCamera=new CockpitCamera({jeep,plane});cameraRig.applyCockpit=(camera,state,active)=>cockpitCamera.apply(camera,state,active);
+ renderQuality.register(gltf.scene);
  plane.position.set(E.DOCK.x,E.FLIGHT.waterHeight,E.DOCK.z);plane.rotation.set(0,Math.PI,0);
  if(propeller){propellerBlur=createPropellerBlur();propeller.add(propellerBlur);}
  for(const name of ['PlaneAileronLeft','PlaneAileronRight','PlaneElevatorLeft','PlaneElevatorRight','PlaneRudder'])flightSurfaces[name]=gltf.scene.getObjectByName(name);
@@ -126,12 +128,12 @@ new GLTFLoader().load('./assets/northbound.glb',gltf=>{
 
 function clearInput(){keys.clear();held.clear();document.querySelectorAll('[data-control]').forEach(b=>b.classList.remove('pressed'));}
 function toast(text){$('#toast').textContent=text;$('#toast').classList.add('visible');toastLife=4;}
-function start(){if(!ready)return;benchmarkView=null;E.begin(state,selectedVehicle);mode='chase';$('#camera').innerHTML='Orbit <b>C</b>';clearInput();$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').disabled=false;$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='jeep'?'Leave your parking bay toward the access aisle. Drive Jeep / Fly Plane changes vehicle.':'Space starts the engine. Shift adds power. At idle, B pushes backward on water.');}
+function start(){if(!ready)return;benchmarkView=null;E.begin(state,selectedVehicle);mode='chase';$('#camera').innerHTML='Chase <b>C</b>';clearInput();$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').disabled=false;$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='jeep'?'Leave your parking bay toward the access aisle. Drive Jeep / Fly Plane changes vehicle.':'Space starts the engine. Shift adds power. At idle, B pushes backward on water.');}
 function pause(){if(!['running','paused'].includes(state.status))return;E.togglePause(state);clearInput();cameraRig.setEnabled(state.status==='running');if(state.status==='paused'){
   $('#title').innerHTML='Stay a<br>little longer.';$('#description').textContent='Your drive or flight is paused. The lake can wait.';$('#start').innerHTML='Back to the lake <span>↗</span>';$('#restart').classList.remove('hidden');$('#steps').classList.add('hidden');$('#overlay').classList.remove('hidden');document.body.classList.add('intro-open');$('#pause').textContent='▶';$('#pause').setAttribute('aria-label','Resume game');
  }else{$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();}}
-function switchVehicle(vehicle){if(!ready)return;selectedVehicle=typeof vehicle==='string'?vehicle:(state.phase==='jeep'?'plane':'jeep');if(state.status!=='running'){start();return;}if(state.phase===selectedVehicle){canvas.focus();return;}E.switchVehicle(state,selectedVehicle);clearInput();mode='chase';$('#camera').innerHTML='Orbit <b>C</b>';cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='plane'?'Space starts the engine. Wait for idle, then Shift to accelerate and W to lift off.':'W / S throttle and reverse · A / D steer · Shift to accelerate.');}
-function changeCamera(){if(!ready)return;mode=mode==='chase'?'orbit':mode==='orbit'?'cabin':'chase';cameraRig.setMode(mode,state);$('#camera').innerHTML=(mode==='chase'?'Orbit':mode==='orbit'?'Wide orbit':'Cabin')+' <b>C</b>';}
+function switchVehicle(vehicle){if(!ready)return;selectedVehicle=typeof vehicle==='string'?vehicle:(state.phase==='jeep'?'plane':'jeep');if(state.status!=='running'){start();return;}if(state.phase===selectedVehicle){canvas.focus();return;}E.switchVehicle(state,selectedVehicle);clearInput();mode='chase';$('#camera').innerHTML='Chase <b>C</b>';cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='plane'?'Space starts the engine. Wait for idle, then Shift to accelerate and W to lift off.':'W / S throttle and reverse · A / D steer · Shift to accelerate.');}
+function changeCamera(){if(!ready)return;mode=mode==='chase'?'orbit':mode==='orbit'?'cockpit':mode==='cockpit'?'cabin':'chase';cameraRig.setMode(mode,state);$('#camera').innerHTML=(mode==='chase'?'Chase':mode==='orbit'?'Orbit':mode==='cockpit'?'Cockpit':'Cabin')+' <b>C</b>';}
 function formatTime(t){return String(Math.floor(t/60)).padStart(2,'0')+':'+(t%60).toFixed(1).padStart(4,'0');}
 function sync(){
  const flying=state.phase==='plane',off=flying&&state.enginePhase==='off'&&!state.parked,starting=flying&&state.enginePhase==='starting';

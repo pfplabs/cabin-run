@@ -145,3 +145,17 @@ test('active trackpad and pinch consume browser defaults; pause clears the track
  canvas.emit('wheel',{deltaX:0,deltaY:40,deltaMode:0,timeStamp:1030,preventDefault});
  assert.ok(rig.desiredCamera.position.distanceTo(rig.target)>radius);rig.dispose();
 });
+
+test('cockpit locks input, bypasses exterior collision and restores near plane and orbit',()=>{
+ const {rig,state,camera,canvas,doc,captures}=fixture();let active=false,collisions=0;
+ rig.applyCockpit=(c,s,on)=>{active=on;if(on){c.position.set(s.x, s.y+2,s.z);return true;}return false;};
+ rig.resolveCamera=({desiredPosition})=>{collisions++;return desiredPosition;};
+ canvas.emit('pointerdown',pointer(1,100,100));
+ rig.setMode('cockpit',state);assert.equal(captures.size,0);assert.equal(rig.controls.enabled,false);near(camera.near,.04);
+ const count=collisions;
+ canvas.emit('wheel',{deltaY:-100});doc.emit('pointermove',pointer(1,200,200));
+ state.x+=10;rig.update(state,.016);near(camera.position.x,state.x);assert.equal(collisions,count);assert.equal(active,true);
+ rig.setEnabled(false);rig.setEnabled(true);assert.equal(active,true);
+ rig.setMode('orbit',state);assert.equal(active,false);near(camera.near,.2);assert.equal(rig.controls.enabled,true);
+ assert.ok(camera.position.distanceTo(rig.target)>4);rig.dispose();
+});
