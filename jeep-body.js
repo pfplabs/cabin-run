@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from './vendor/utils/BufferGeometryUtils.js';
+import {applyPickupWheels} from './pickup-wheels.js';
 
 // Reference-guided Tacoma-style pickup; legacy function/root names preserve controls.
 // Separate skin, glass and interior geometry leaves actual window openings.
@@ -217,22 +218,15 @@ export function applyJeepBody(root){
   parts.alloy.push(new THREE.TorusGeometry(.106,.009,6,24).translate(x,2.47,-.177));
   parts.lamp.push(new THREE.SphereGeometry(.10,20,10).scale(1,1,.22).translate(x,2.47,-.18));
  }
- // Lower the brilliant default wheel alloys and add concentric moulded sidewall
- // detail without touching any steering or rolling transforms.
- for(const wheel of jeep.children.filter(o=>o.name.startsWith('JeepWheel'))){
-  const sign=wheel.name.includes('Left')?-1:1;
-  for(const mesh of wheel.children)if(mesh.isMesh&&mesh.material.name==='Aluminium'){mesh.material=mesh.material.clone();mesh.material.color.set(0x8a9190);mesh.material.roughness=.31;mesh.material.metalness=.9;}
-  const bands=[];for(const r of [.33,.47,.50])bands.push(new THREE.TorusGeometry(r,.006,5,40).rotateY(Math.PI/2).translate(sign*.145,0,0));
-  const geo=mergeGeometries(bands.map(g=>g.toNonIndexed()));const mesh=new THREE.Mesh(geo,palette.trim);mesh.name='Moulded sidewall bands';wheel.add(mesh);bands.forEach(g=>g.dispose());
- }
  const pickupZ=z=>z<-.5?-.5+(z+.5)*1.12:z<=.65?-.5+(z+.5)*1.20:z<=.8?.88+(z-.65)*3.2:1.36+(z-.8)*1.20;
  for(const wheel of jeep.children.filter(o=>o.name.startsWith('JeepWheel')))wheel.position.z=pickupZ(wheel.position.z);
- const stats={retiredTriangles,triangles:0,draws:0,wheelDetailDraws:4,wheelDetailTriangles:4800,bodyStyle:'Tacoma-style pickup'};
+ const stats={retiredTriangles,triangles:0,draws:0,bodyStyle:'Tacoma-style pickup'};
  for(const [kind,items] of Object.entries(parts)){
   const clean=items.map(g=>{const a=g.index?g.toNonIndexed():g;a.deleteAttribute('uv');a.deleteAttribute('uv1');return a;});
   const g=mergeGeometries(clean),positions=g.attributes.position,normals=g.attributes.normal,n=new THREE.Vector3();
   for(let i=0;i<positions.count;i++){const z=positions.getZ(i),stretch=z<-.5?1.12:z<=.65?1.20:z<=.8?3.2:1.20;positions.setZ(i,pickupZ(z));n.fromBufferAttribute(normals,i);n.z/=stretch;n.normalize();normals.setXYZ(i,n.x,n.y,n.z);}const o=new THREE.Mesh(g,palette[kind]);o.name='Rebuilt Jeep '+kind;o.castShadow=kind!=='glass';o.receiveShadow=kind!=='glass';jeep.add(o);
   stats.triangles+=g.attributes.position.count/3;stats.draws++;for(const a of clean)a.dispose();for(const a of items)a.dispose();
  }
+ stats.wheels=applyPickupWheels(jeep);
  jeep.userData.bodyRebuild=stats;return stats;
 }
