@@ -79,10 +79,11 @@ const gravelMaterial=createGravelMaterial(),roadDust=new RoadDust();scene.add(ro
 const roadPts=Array.from({length:641},(_,i)=>E.roadPoint(i/640*Math.PI*2));
 ribbon(roadPts,10.4,0x777a70,.06,gravelMaterial);ribbon(roadPts,8.4,0x363c3b,.09,asphaltMaterial);
 for(const [width,y,material,clipWidth] of [[6.5,.06,gravelMaterial,5.2],[4.5,.09,asphaltMaterial,4.2]]){const source=createRoadRibbonGeometry(E.DRIVEWAY,width,{offset:y}),mesh=new THREE.Mesh(clipRibbonOutsideRoad(source,roadPts,clipWidth),material);source.dispose();mesh.receiveShadow=true;scene.add(mesh);}
-const roadMarks=[];
-for(let i=0;i<640;i+=5)roadMarks.push(ribbon([roadPts[i],roadPts[i+1]],.11,0xdedbd0,.106,null,false).geometry);
+const roadMarks=[],yellowMarks=[];
+for(let i=0;i<640;i+=5)yellowMarks.push(ribbon([roadPts[i],roadPts[i+1]],.14,0xe9b928,.106,null,false).geometry);
 for(const side of [-1,1]){const edge=roadPts.map((p,i)=>{const prev=roadPts[(i+639)%640],next=roadPts[(i+1)%640],dx=next.x-prev.x,dz=next.z-prev.z,l=Math.hypot(dx,dz)||1;return {x:p.x-dz/l*3.9*side,z:p.z+dx/l*3.9*side};});roadMarks.push(ribbon(edge,.075,0xdedbd0,.106,null,false).geometry);}
 const centerLine=new THREE.Mesh(mergeGeometries(roadMarks),new THREE.MeshStandardMaterial({color:0xdedbd0,roughness:.9,side:THREE.DoubleSide}));centerLine.receiveShadow=true;scene.add(centerLine);roadMarks.forEach(g=>g.dispose());
+const yellowCenterLine=new THREE.Mesh(mergeGeometries(yellowMarks),new THREE.MeshStandardMaterial({color:0xe9b928,roughness:.9,side:THREE.DoubleSide}));yellowCenterLine.name='Yellow two-way centerline';yellowCenterLine.receiveShadow=true;scene.add(yellowCenterLine);yellowMarks.forEach(g=>g.dispose());
 // Roadside posts make the finite drivable edge legible, not an invisible wall.
 const postG=new THREE.CylinderGeometry(.065,.08,1,5),postM=new THREE.MeshStandardMaterial({color:0xd7cbb0});const posts=new THREE.InstancedMesh(postG,postM,192);const dummy=new THREE.Object3D();
 for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),q=E.roadPoint(a+.0001),length=Math.hypot(q.x-p.x,q.z-p.z),x=p.x+6.3*(q.z-p.z)/length,z=p.z-6.3*(q.x-p.x)/length;dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
