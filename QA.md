@@ -1,28 +1,30 @@
 # Verification record
 
-## Passed
-- `node --check game.js` and `node --check engine.js`.
-- `npm test`: 10 deterministic simulation tests, including full input-driven road-to-cabin and launch-to-dock trips.
-- `node scripts/inspect-scene.mjs`: actual GLB parsing, 87 mesh primitives, 29,508 triangles, 27 materials, named JeepRoot / PlaneRoot / Propeller, finite vertices.
-- Blender 4.3.2 saved editable source and exported the GLB; a real Cycles render was visually inspected.
+## Expanded lake update: automated checks passed
+- `node --check` for `game.js`, `engine.js`, `environment.js`, `foliage.js`, `camera-rig.js` and the capture helper.
+- `npm test`: 28 deterministic tests (16 simulation, 6 camera and 6 environment).
+- Simulation covers a complete winding road circuit through the tunnel, continuous road-to-driveway-to-cabin travel, launch-to-dock travel, reversing away from tunnel walls, elevated terrain, boundaries and unchanged vehicle speeds. Lake area is verified as exactly four times the first version.
+- Camera tests cover both vehicle targets, mouse orbit and wheel zoom, touch orbit/pinch, concurrent driving touches, zoom limits, pause/resume and cleanup. These are simulated DOM tests, not physical-device tests.
+- Environment tests inspect upward-facing ground, an empty traversable tunnel volume with real walls and roof, sandbar position, connected parking and finite instanced shore geometry.
+- `node scripts/inspect-scene.mjs`: actual GLB parsing, 51 mesh primitives, 107,960 triangles, 30 materials, named JeepRoot / PlaneRoot / Propeller, finite vertices. Model source reopens in Blender 4.3.2.
+- Main branch and the old prototype are preserved. No deployment has been performed.
 
-## Requires WebGL-capable browser QA
-The managed cloud Chromium disabled its GPU/WebGL backend. No gameplay video or browser-rendered visual pass is claimed yet.
+## Previous iteration: Mac browser verified
+A real Mac browser rendered the earlier scene and verified jeep acceleration/steering, aircraft climb/turn, pause, vehicle switching, boundary recovery and active reflections. That pass identified metallic-looking water, angular shoreline, sparse repeated trees, dark terrain and simplified vehicle surfaces. The expanded update specifically addresses these, but visual improvement is not asserted without a new browser capture.
+
+## Expanded update: browser QA still needed
+The managed cloud Chromium disables WebGL. Automated simulation and geometry checks do not establish visual quality or frame rate.
 
 Run `python3 -m http.server 4173` and visit `http://localhost:4173/?qa=1` in a WebGL 2 browser:
-1. Confirm scene loads with no console or network errors. Inspect `cabinDiagnostics()`.
-2. Start driving, throttle, steer, reverse and brake. Follow the road to the gravel cabin turnoff.
-3. Hit the shoreline, cabin and outer edge; verify bounded motion and recovery by reversing.
-4. Press V, fly toward the cabin, climb, descend, bank and slow. Moor near the dock with Space, then take off again.
-5. Switch cameras repeatedly, drag to look, then switch vehicles. Chase camera must remain stable.
-6. Pause and resume, restart from pause, switch tabs and return. No stuck input or time jumps.
-7. Check 390 x 844 mobile layout and simultaneous touch directions; physical-device play remains recommended.
-8. Capture genuine gameplay only after these pass. Record one jeep shoreline approach and one floatplane lake-to-cabin approach. Keep Blender renders labeled separately.
+1. Confirm no console or network errors and inspect `cabinDiagnostics()`.
+2. Drive the entire winding road in both directions, including hill and tunnel. Inspect road/ground alignment, tunnel clearance, headlights, wheel animation and reversing recovery.
+3. Take the gravel turnoff to the cabin, enter all three parking bays, and check driveway connectivity without visual terrain clipping.
+4. Hit shoreline, cabin and outer boundary. Verify bounded motion and recovery by reversing.
+5. Switch to the plane, climb above the ridge, turn, descend and slow. Moor with Space near the dock, then take off again.
+6. Drag orbit and scroll zoom around both vehicles while moving. Check camera height, tunnel behavior and zoom limits. Switch camera modes and vehicles repeatedly.
+7. Pause/resume during drag, restart from pause, switch tabs and return. Check for stuck input and time jumps.
+8. On a real touch device, use one-finger orbit and pinch while simultaneously holding driving controls. Check the 390 × 844 layout.
+9. Inspect water color/reflections, shoreline smoothness, trees, model detail, lighting and sustained frame rate on the actual target desktop and mobile devices. No photorealistic parity is claimed.
+10. Record a final gameplay trailer only after the user is satisfied. Keep Blender previews labeled separately.
 
-Optional setup helpers in QA mode: `cabinQA.start()`, `cabinQA.switchVehicle()`, `cabinQA.setMode('cabin')`. `cabinQA.state` can arrange a shot; record actual frame-by-frame simulation after setup and disclose staged starts where relevant. Do not use synthetic renders as gameplay.
-
-## Material pass checks
-- Photographed HDR decoded successfully as 1024 × 512 RGBE.
-- HDR, Water and foliage module imports pass without a GPU.
-- Syntax, physical-material defaults and all 10 simulation tests remain passing.
-- New ground/stone shaders, HDR orientation, exposure, timber UV scale, glass transmission, needle-card performance and mobile graphics still require live WebGL testing.
+QA-only setup: `cabinQA.start()`, `cabinQA.switchVehicle()`, `cabinQA.setMode('cabin')`. State changes can arrange a test or shot; actual recorded motion must come from frame-by-frame simulation, with staged starts disclosed where relevant. Do not substitute synthetic renders for gameplay.

@@ -1,9 +1,11 @@
 /** Optional capture helper for a WebGL-capable desktop. Records the real browser frames.
  * Install Playwright separately, then: node scripts/record-gameplay.mjs
- * Start the static server first. OUTPUT and GAME_URL are optional environment vars.
+ * Final trailer capture is deferred until the user is satisfied with the game.
+ * Start the static server first. OUTPUT, GAME_URL and FULL_LOOP=1 are optional.
  */
 import {mkdir} from 'node:fs/promises';
 import path from 'node:path';
+import {WORLD,DRIVEWAY,HOME,DOCK,roadPoint} from '../engine.js';
 const {chromium}=await import('playwright').catch(()=>{throw new Error('Capture only: install Playwright with npm install --no-save playwright, then run this on a desktop with Chrome and WebGL 2.');});
 const out=path.resolve(process.env.OUTPUT||'artifacts/gameplay');await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:false});
@@ -14,17 +16,21 @@ await page.waitForFunction(()=>window.__CABIN_READY__===true,null,{timeout:45000
 await page.waitForTimeout(2000);await page.screenshot({path:path.join(out,'01-lake-intro.png')});
 await page.locator('#start').click();
 // An input-following demonstration, not a fake animation or substituted render.
-const route=await page.evaluate(()=>{const s=cabinQA.state,p=[];for(let a=Math.atan2(s.x,62-s.z)+.08;a<-.24;a+=.08)p.push({x:94*Math.sin(a),z:62-94*Math.cos(a)});p.push({x:-22,z:-29},{x:-23,z:-19},{x:-16,z:-9});return p;});
-let waypoint=0;const deadline=Date.now()+90000;
+const state=await page.evaluate(()=>({x:cabinQA.state.x,z:cabinQA.state.z}));
+const startAngle=Math.atan2(state.x,WORLD.centerZ-state.z),route=[];
+const endAngle=-.65+(process.env.FULL_LOOP==='1'?Math.PI*2:0);
+for(let a=startAngle+.025;a<endAngle;a+=.025)route.push(roadPoint(a));
+route.push(...DRIVEWAY.slice(0,-1),HOME);
+let waypoint=0;const deadline=Date.now()+(process.env.FULL_LOOP==='1'?300000:90000);
 while(waypoint<route.length&&Date.now()<deadline){
- const result=await page.evaluate(p=>{const s=cabinQA.state;if(s.status!=='running')throw new Error('Capture lost focus and paused. Keep the browser active.');const d=Math.hypot(p.x-s.x,p.z-s.z),target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));cabinQA.input.clear();if(s.speed<9)cabinQA.input.add('up');if(error<-.035)cabinQA.input.add('left');if(error>.035)cabinQA.input.add('right');return d;},route[waypoint]);
- if(result<2.5)waypoint++;await page.waitForTimeout(50);
+ const result=await page.evaluate(p=>{const s=cabinQA.state;if(s.status!=='running')throw new Error('Capture lost focus and paused. Keep the browser active.');const d=Math.hypot(p.x-s.x,p.z-s.z),target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));cabinQA.input.clear();if(s.speed<7)cabinQA.input.add('up');if(error<-.035)cabinQA.input.add('left');if(error>.035)cabinQA.input.add('right');return d;},route[waypoint]);
+ if(result<1.4)waypoint++;await page.waitForTimeout(50);
 }
 await page.evaluate(()=>cabinQA.input.clear());if(waypoint<route.length)throw new Error('Road sequence did not reach the cabin. Inspect recorded gameplay instead of claiming success.');
 await page.keyboard.press('Space');await page.screenshot({path:path.join(out,'02-jeep-at-cabin.png')});await page.waitForTimeout(1500);
 await page.keyboard.press('v');const flightDeadline=Date.now()+20000;
 while(Date.now()<flightDeadline){
- const ready=await page.evaluate(()=>{const s=cabinQA.state,p={x:-25,z:16},target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));cabinQA.input.clear();if(error<-.015)cabinQA.input.add('left');if(error>.015)cabinQA.input.add('right');return s.actionReady;});
+ const ready=await page.evaluate(dock=>{const s=cabinQA.state,p=dock,target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));cabinQA.input.clear();if(error<-.015)cabinQA.input.add('left');if(error>.015)cabinQA.input.add('right');return s.actionReady;},DOCK);
  if(ready)break;await page.waitForTimeout(50);
 }
 await page.evaluate(()=>cabinQA.input.clear());await page.screenshot({path:path.join(out,'03-plane-approach.png')});await page.keyboard.press('Space');
