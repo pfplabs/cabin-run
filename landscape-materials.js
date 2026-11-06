@@ -107,7 +107,7 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
     lmGround=mix(lmGround,lmSandColour,lmShore);
     lmGround=mix(lmGround,lmRock,max(lmRockMask,smoothstep(260.,450.,vLMWorld.y)));
     // Snow gathers above the high snowline, with broken edges and exposed steep rock.
-    float lmSnow=smoothstep(530.,650.,vLMWorld.y+(lmLarge.r-.5)*65.)*
+    float lmSnow=smoothstep(210.,275.,vLMWorld.y+(lmLarge.r-.5)*25.)*
       (1.-smoothstep(.45,.8,lmSlope));
     vec3 lmSnowColour=mix(vec3(.68,.75,.79),vec3(.91,.94,.95),lmLarge.r);
     lmGround=mix(lmGround,lmSnowColour,lmSnow);

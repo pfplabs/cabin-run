@@ -20,8 +20,8 @@ const passStart=.38,passPeak=1.55,passEnd=2.95,passSamples=2048,passDistances=ne
 for(let i=1;i<=passSamples;i++){const a=passStart+(passEnd-passStart)*i/passSamples,b=passStart+(passEnd-passStart)*(i-1)/passSamples,ra=routeRadius(a),rb=routeRadius(b);passDistances[i]=passDistances[i-1]+Math.hypot(ra*Math.sin(a)-rb*Math.sin(b),ra*Math.cos(a)-rb*Math.cos(b));}
 const passDistance=a=>{const f=Math.max(0,Math.min(passSamples,(a-passStart)/(passEnd-passStart)*passSamples)),i=Math.min(passSamples-1,Math.floor(f));return passDistances[i]+(passDistances[i+1]-passDistances[i])*(f-i);};
 const climbLength=passDistance(passPeak),descentLength=passDistances[passSamples]-climbLength;
-const passElevation=a=>{a=wrap(a);return a<=passPeak?215*smoothRoute(passDistance(a)/climbLength):215*(1-smoothRoute((passDistance(a)-climbLength)/descentLength));};
-const routeHeight=a=>1.1+70*Math.exp(-((wrap(a-.2)/.78)**2))+passElevation(a)+22*Math.exp(-Math.pow(wrap(a-Math.PI)/.48,4));
+const passElevation=a=>{a=wrap(a);return a<=passPeak?85*smoothRoute(passDistance(a)/climbLength):85*(1-smoothRoute((passDistance(a)-climbLength)/descentLength));};
+const routeHeight=a=>1.1+16*Math.exp(-((wrap(a-.2)/.78)**2))+passElevation(a)+22*Math.exp(-Math.pow(wrap(a-Math.PI)/.48,4));
 export function roadPoint(a){const r=routeRadius(a);return {x:r*Math.sin(a),y:routeHeight(a),z:WORLD.centerZ-r*Math.cos(a)};}
 /** Nearest curve station keeps steep S-bend cross-sections level and full-width. */
 export function roadSample(x,z){
@@ -34,10 +34,23 @@ export function roadSample(x,z){
  return {angle:wrap(a),y:p.y,offset:Math.sign(side)*Math.hypot(x-p.x,z-p.z)};
 }
 export function roadOffset(x,z){return roadSample(x,z).offset;}
-export const DRIVEWAY=[roadPoint(-.65),{x:-230,z:-28,y:14.5},{x:-130,z:-19,y:8.5},{x:-58,z:-14,y:4},{x:-37,z:-19,y:2},{x:-31,z:-19,y:1.1},{x:-26,z:-19,y:1.1},{x:-26,z:-9,y:1.1},{x:-26,z:3,y:1.1}];
+// A gently graded approach enters a twelve-metre-radius turn into the bay aisle.
+// Shared sampled centreline drives terrain, asphalt, forest clearance and map.
+const drivewayStart=roadPoint(-.65);
+export const DRIVEWAY=[];
+for(let i=0;i<=24;i++){
+ const t=i/24,u=1-t;
+ DRIVEWAY.push({x:u*u*u*drivewayStart.x+3*u*u*t*-230+3*u*t*t*-90+t*t*t*-38,
+  z:u*u*u*drivewayStart.z+3*u*u*t*-30+3*u*t*t*-30+t*t*t*-30,
+  y:1.1+(drivewayStart.y-1.1)*(1-smoothRoute(t))});
+}
+for(let i=1;i<=12;i++){const a=i/12*Math.PI/2;DRIVEWAY.push({x:-38+12*Math.sin(a),z:-18-12*Math.cos(a),y:1.1});}
+DRIVEWAY.push({x:-26,z:-9,y:1.1},{x:-26,z:.5,y:1.1});
 export const DOCK={x:-23.7,z:30};
 export const DOCK_BOUNDS={minX:-21.20,maxX:-14.925,minZ:2,maxZ:36,maxY:2.025};
 export const HOME={x:-16,z:-9};
+export const PARKING_APRON={x:-20,z:-9,width:17.5,length:25,cornerRadius:2};
+export function onParkingApron(x,z){const p=PARKING_APRON,qx=Math.max(Math.abs(x-p.x)-(p.width/2-p.cornerRadius),0),qz=Math.max(Math.abs(z-p.z)-(p.length/2-p.cornerRadius),0);return Math.hypot(qx,qz)<=p.cornerRadius;}
 export const PARKING=[{x:-16,z:-16,width:4.6,length:7},{x:-16,z:-9,width:4.6,length:7},{x:-16,z:-2,width:4.6,length:7}];
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function lakeBoundaryPoint(a){const r=shorelineScale(a);return {x:LAKE.rx*r*Math.sin(a),z:LAKE.z-LAKE.rz*r*Math.cos(a)};}
@@ -67,21 +80,26 @@ export function terrainHeight(x,z){
  const foundationDistance=Math.hypot(Math.max(-2.8-x,0,x-23.8),Math.max(-26.4-z,0,z+6.5));
  return height+(1.1-height)*(1-smooth(foundationDistance/2.2));
 }
-/** One continuous massif grows directly from the uphill road shoulder.
+/** The distant eastern massif rises above the forest pass, away from the cabin.
  * Shared by rendering and flight clearance; the paved corridor is unchanged. */
 export function mountainHeight(x,z){
  const a=Math.atan2(x,WORLD.centerZ-z),d=Math.hypot(x,z-WORLD.centerZ)-routeRadius(a)-6;
  if(d<=0)return -Infinity;
- const angle=wrap(a-.2),edge=1-smooth((Math.abs(angle)-.72)/.5);
- if(edge===0)return -Infinity;
- // Broad left shoulder fills the old trough; angular ribs never cut a radial valley.
+ const angle=wrap(a-1.65),edge=1-smooth((Math.abs(angle)-.60)/.45);
+
+ // Rounded eastern flanks retain small exposed peaks above the forest.
  const flank=Math.exp(-Math.pow(angle/.68,2))*(.96+.04*Math.cos(angle*18));
- const ascent=Math.pow(Math.sin(Math.min(d/700,1)*Math.PI/2),1.12);
- const back=1-smooth((d-700)/900);
- const massif=(routeHeight(a)+820*ascent*flank)*edge*back;
+ const ascent=Math.pow(Math.sin(Math.min(d/500,1)*Math.PI/2),1.12);
+ const back=1-smooth((d-500)/900);
+ const massif=edge>0?(routeHeight(a)+210*ascent*flank)*edge*back:-Infinity;
  const portalBlend=smooth((a-(TUNNEL.startAngle-.06))/.06)*(1-smooth((a-TUNNEL.endAngle)/.06));
  const cover=(routeHeight(a)+10*smooth(d/5)+Math.max(0,d-5)*.8)*portalBlend*(1-smooth((d-35)/25));
- return Math.max(massif,cover);
+ return Math.max(massif,portalBlend>0?cover:-Infinity);
+}
+// Low distant foothills preserve the reference's open sky behind the cabin.
+export function backdropHeight(x,z){
+ const rise=Math.max(0,roadRadius(x,z)-1.17);
+ return .65*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22));
 }
 export const waterfallHill=(x,z)=>62*Math.exp(-Math.pow(x/75,2)-Math.pow((z-1020)/80,2));
 export function fresh(){return {status:'ready',phase:'jeep',x:-16,y:terrainHeight(-16,-9),z:-9,heading:-.45,speed:0,pitch:0,roll:0,elapsed:0,cooldown:0,events:[],actionReady:false,takeoff:0,parked:false,arrived:false,...flightState(),...jeepState()}}
@@ -176,8 +194,7 @@ function updateJeep(s,input,steer,dt){
  if(s.actionReady&&!s.arrived){s.arrived=true;s.events.push({type:'home',text:'You made it home. The lake is yours to explore.'});}
 }
 function flightGroundHeight(x,z){
- const outer=roadRadius(x,z),rise=Math.max(0,outer-1.17);
- return Math.max(terrainHeight(x,z),mountainHeight(x,z),waterfallHill(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
+ return Math.max(terrainHeight(x,z),mountainHeight(x,z),waterfallHill(x,z),backdropHeight(x,z));
 }
 function flightClearance(x,z){
  const angle=Math.atan2(x,WORLD.centerZ-z),offset=Math.abs(roadOffset(x,z));

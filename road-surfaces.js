@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {terrainHeight,roadOffset,DRIVEWAY} from './engine.js';
+import {terrainHeight,roadOffset,DRIVEWAY,onParkingApron} from './engine.js';
 
 /** Dense stations make the road follow the same terrain used by the tyres. */
 export function createRoadRibbonGeometry(points,width,{offset=.08,spacing=1,heightAt=terrainHeight}={}){
@@ -37,7 +37,7 @@ export function isGravel(x,z){
  if(driveDistance<2.25)return false;
  if(driveDistance<3.7)return true;
  const d=Math.abs(roadOffset(x,z));if(d>=4.2&&d<7.5)return true;
- return x>-30&&x<-11&&z>-22&&z<5;
+ return onParkingApron(x,z);
 }
 
 /** Trim branch asphalt at the main-road edge, avoiding stacked junction faces. */

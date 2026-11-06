@@ -3,7 +3,7 @@ import {shorelineScale} from './shoreline.js';
 import * as THREE from 'three';
 import {createRockMaterial,createGraniteGeometry} from './landscape-materials.js';
 import {clipRibbonOutsideRoad,createGravelMaterial} from './road-surfaces.js';
-import {LAKE,WORLD,terrainHeight,mountainHeight,waterfallHill,lakeRadius,roadOffset,roadPoint,TUNNEL,PARKING,DRIVEWAY} from './engine.js';
+import {LAKE,WORLD,terrainHeight,mountainHeight,backdropHeight,waterfallHill,lakeRadius,roadOffset,roadPoint,TUNNEL,PARKING,PARKING_APRON,DRIVEWAY} from './engine.js';
 
 const smooth=(a,b,x)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 export function landscapeHeight(x,z){
@@ -11,13 +11,14 @@ export function landscapeHeight(x,z){
  const shoreInner=1-3.42/LAKE.rz,shoreOuter=1+3.99/LAKE.rz;
  if(lake<shoreInner)return -3;
  if(lake<shoreOuter)return THREE.MathUtils.lerp(-3,terrainHeight(x,z),smooth(shoreInner,shoreOuter,lake));
- const outer=Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius),rise=Math.max(0,outer-1.17);
- const roadGround=terrainHeight(x,z),backdrop=outer<1.17?-Infinity:2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22));
+ const outer=Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius);
+ const roadGround=terrainHeight(x,z),backdrop=outer<1.17?-Infinity:backdropHeight(x,z);
  const natural=Math.max(roadGround,mountainHeight(x,z),waterfallHill(x,z),backdrop);
  // Keep the paved surface exact even where the pass traverses the outer hills.
  const blend=smooth(6,35,Math.abs(roadOffset(x,z))),height=THREE.MathUtils.lerp(roadGround,natural,blend);
  // Uphill tunnel bedrock begins just outside the clear driving envelope.
- const covered=Math.max(height,mountainHeight(x,z));
+ const angle=Math.atan2(x,WORLD.centerZ-z);
+ const covered=angle>=TUNNEL.startAngle-.06&&angle<=TUNNEL.endAngle+.06?Math.max(height,mountainHeight(x,z)):height;
  return gorgeHeight(x,z,covered);
 }
 
@@ -191,8 +192,16 @@ export function createMountainTunnel(){
 }
 export function createParkingLot(){
  const group=new THREE.Group();group.name='Cabin side-road parking';
- const ground=new THREE.PlaneGeometry(19,27,14,18);ground.rotateX(-Math.PI/2);ground.translate(-20.5,0,-8.5);
- const p=ground.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,terrainHeight(p.getX(i),p.getZ(i))+.08);ground.computeVertexNormals();
+ const apron=PARKING_APRON,ground=new THREE.PlaneGeometry(apron.width,apron.length,18,26);ground.rotateX(-Math.PI/2);ground.translate(apron.x,0,apron.z);
+ const p=ground.attributes.position,uv=ground.attributes.uv;
+ for(let i=0;i<p.count;i++){
+  // Rounded gravel corners and the same two-metre texture repeat as shoulders.
+  let x=p.getX(i),z=p.getZ(i),dx=x-apron.x,dz=z-apron.z;
+  const qx=Math.max(Math.abs(dx)-(apron.width/2-apron.cornerRadius),0),qz=Math.max(Math.abs(dz)-(apron.length/2-apron.cornerRadius),0),r=Math.hypot(qx,qz);
+  if(r>apron.cornerRadius){x-=Math.sign(dx)*qx*(1-apron.cornerRadius/r);z-=Math.sign(dz)*qz*(1-apron.cornerRadius/r);}
+  p.setXYZ(i,x,terrainHeight(x,z)+.08,z);uv.setXY(i,x/2,z/2);
+ }
+ ground.computeVertexNormals();
  const gravel=new THREE.Mesh(clipRibbonOutsideRoad(ground,DRIVEWAY,2.25),createGravelMaterial());ground.dispose();gravel.receiveShadow=true;group.add(gravel);
  const paint=new THREE.MeshStandardMaterial({color:0xdedbc4,roughness:1,transparent:true,opacity:.82});
  for(const bay of PARKING){

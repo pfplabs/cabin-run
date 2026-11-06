@@ -5,7 +5,7 @@ import {roadPoint,roadSample,terrainHeight,lakeBoundaryPoint,lakeRadius,roadLeng
 import {createLandscapeGeometry,landscapeHeight} from '../environment.js';
 import {shorelineScale,SHORELINE_GLSL} from '../shoreline.js';
 
-test('mountain pass climbs above 210 metres through real S-bends and descends to bridge',()=>{
+test('mountain pass climbs to a modest forest pass through real S-bends and descends to bridge',()=>{
  let high=0,maxGrade=0,turns=0,last=0;
  for(let a=.38;a<2.95;a+=.005){
   const p=roadPoint(a-.001),q=roadPoint(a),r=roadPoint(a+.001);
@@ -13,7 +13,7 @@ test('mountain pass climbs above 210 metres through real S-bends and descends to
   const dx=(r.x-p.x)/.002,dz=(r.z-p.z)/.002,ddx=(r.x-2*q.x+p.x)/1e-6,ddz=(r.z-2*q.z+p.z)/1e-6,cross=dx*ddz-dz*ddx;
   if(Math.abs(cross)>1000){if(last&&Math.sign(cross)!==last)turns++;last=Math.sign(cross);}
  }
- assert.ok(high>210&&high<230);assert.ok(maxGrade<.24);assert.ok(turns>=6);assert.ok(roadLength()>4700&&roadLength()<4900);assert.ok(roadPoint(BRIDGE.angle).y>22&&roadPoint(BRIDGE.angle).y<25);
+ assert.ok(high>85&&high<95);assert.ok(maxGrade<.24);assert.ok(turns>=6);assert.ok(roadLength()>4700&&roadLength()<4900);assert.ok(roadPoint(BRIDGE.angle).y>22&&roadPoint(BRIDGE.angle).y<25);
 });
 test('S-bend road cross-sections stay full-width and level rather than banking into terrain',()=>{
  for(let a=.4;a<2.9;a+=.02){const p=roadPoint(a),q=roadPoint(a+.0001),len=Math.hypot(q.x-p.x,q.z-p.z);

@@ -145,7 +145,7 @@ test('plane clears the elevated ridge and tunnel rock without exceeding ceiling'
 test('driveway levels and terrain road shoulder are continuous',()=>{
  for(const p of E.DRIVEWAY.slice(1))near(E.terrainHeight(p.x,p.z),p.y);
  const a=.2,p=E.roadPoint(a);for(const offset of [-6,6])near(E.terrainHeight(p.x+Math.sin(a)*offset,p.z-Math.cos(a)*offset),p.y);
- const s=running();Object.assign(s,E.roadPoint(-.4),{heading:Math.atan2(E.roadPoint(-.399).x-E.roadPoint(-.4).x,E.roadPoint(-.4).z-E.roadPoint(-.399).z)});E.update(s,{},.02);assert.ok(s.pitch<.05);step(s,{},.7);assert.ok(s.pitch>.05);
+ const s=running();Object.assign(s,E.roadPoint(-.4),{heading:Math.atan2(E.roadPoint(-.399).x-E.roadPoint(-.4).x,E.roadPoint(-.4).z-E.roadPoint(-.399).z)});E.update(s,{},.02);assert.ok(s.pitch<.05);step(s,{},.7);assert.ok(s.pitch>.01&&s.pitch<.04);
 });
 
 test('plane boundary warns, permits manual return and resets countdown',()=>{
@@ -255,7 +255,7 @@ test('expanded lake keeps the original physical shore margin and dock-side drive
  const margin=1+4/E.LAKE.rz;
  for(const p of E.DRIVEWAY)assert.ok(E.lakeRadius(p.x,p.z)>margin);
  const s=running();Object.assign(s,{x:E.HOME.x,z:E.HOME.z,y:E.terrainHeight(E.HOME.x,E.HOME.z),heading:Math.PI});
- follow(s,[E.DRIVEWAY.at(-1)]);assert.ok(s.z>1.5);assert.ok(!s.events.some(e=>e.type==='bump'));
+ follow(s,[E.DRIVEWAY.at(-1)]);assert.ok(Math.hypot(s.x-E.DRIVEWAY.at(-1).x,s.z-E.DRIVEWAY.at(-1).z)<1.2);assert.ok(!s.events.some(e=>e.type==='bump'));
 });
 
 test('extended dock berth floats clear of pier and water taxi cannot pass through pilings',()=>{
