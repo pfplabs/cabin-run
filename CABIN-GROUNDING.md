@@ -29,3 +29,15 @@ were not available; the existing building/parking coordinates were preserved.
 Integration: import `createCabinGrounding` and add its returned group alongside
 forest/road signs, passing the same `landHeight` callback. The game.js diff is
 only this import and scene.add addition; retain all quality-controller work.
+
+## Integrated verification
+
+Integrated as 55d9a88 after renderer controls 95b0990. All 136 combined tests
+pass. Chrome at :4183 rendered the foundation drainage, continuous parking-to-
+entry paving, bay restraints and planting; matched texture on/off captures were
+saved with the fixed cabin camera. The combined runtime map audit had no
+mismatches and the material registry includes all four new batches (83 total).
+The quality panel remains unobstructed when expanded. Jeep start, vehicle
+switching and floatplane engine startup were exercised in the normal preview.
+No console shader/context errors were observed. The new geometry was not included
+in the earlier renderer benchmark table; no combined FPS speedup is claimed.
