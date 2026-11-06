@@ -19,6 +19,16 @@ test('low tunnel ridge still covers the uphill shoulder while preserving the bor
   const p=point(a,11);assert.ok(landscapeHeight(p.x,p.z)>=roadPoint(a).y+9);
  }
 });
+test('rear tunnel ridge blends over a broad shoulder instead of dropping into an isolated mound',()=>{
+ const a=(TUNNEL.startAngle+TUNNEL.endAngle)/2;
+ const heights=[];
+ for(let offset=41;offset<=191;offset++){
+  const p=point(a,offset);heights.push(landscapeHeight(p.x,p.z));
+ }
+ assert.ok(heights[50]>20,'Bedrock should continue behind the crest');
+ for(let i=1;i<heights.length;i++)assert.ok(Math.abs(heights[i]-heights[i-1])<1,'Rear shoulder must blend without a steep artificial drop');
+ assert.ok(heights.at(-1)<15,'Shoulder should return to the low foothills');
+});
 test('pavement and lake-facing tunnel apertures retain their previous ground',()=>{
  for(let a=-Math.PI;a<Math.PI;a+=.025)for(const d of [-11,-5.2,0,5.2]){
   const p=point(a,d);assert.equal(mountainHeight(p.x,p.z),-Infinity);

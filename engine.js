@@ -96,7 +96,10 @@ export function mountainHeight(x,z){
  // Uneven bedrock breaks the level crest without changing the flat cabin or
  // paved corridor. Keep this in the shared height field for flight clearance.
  const ridgeRelief=(3+1.7*Math.sin(a*31+d*.11)+1.1*Math.sin(a*67-d*.19))*smooth(d/12);
- const cover=(routeHeight(a)+10*smooth(d/5)+Math.max(0,d-5)*.8+ridgeRelief)*portalBlend*(1-smooth((d-35)/25));
+ // Hold the modest crest, then carry its rear shoulder into the foothills.
+ // The former 25 m falloff made an isolated, steep-sided artificial mound.
+ // Only uphill bedrock changes: d<=0 above keeps every paved/aperture sample.
+ const cover=(routeHeight(a)+10*smooth(d/5)+Math.min(30,Math.max(0,d-5))*.8+ridgeRelief)*portalBlend*(1-smooth((d-35)/150));
  return Math.max(massif,portalBlend>0?cover:-Infinity);
 }
 // Low distant foothills preserve the reference's open sky behind the cabin.
