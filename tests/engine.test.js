@@ -34,7 +34,7 @@ test('plane accelerates on water before lifting, with smoothed pitch and bank',(
  const s=startedPlane();near(s.speed,0);near(s.y,E.FLIGHT.waterHeight);assert.equal(s.onWater,true);
  step(s,{up:true},2);near(s.speed,0);near(s.y,E.FLIGHT.waterHeight);
  E.update(s,{boost:true,up:true,right:true},.02);assert.ok(s.throttle>0&&s.throttle<.01);assert.ok(s.propRPM>E.FLIGHT.idleRPM);assert.ok(s.yawRate<.01);
- step(s,{boost:true,up:true},6);assert.ok(s.speed>10);assert.ok(s.y>E.FLIGHT.waterHeight+1);assert.equal(s.onWater,false);
+ step(s,{boost:true,up:true},8);assert.ok(s.speed>10);assert.ok(s.y>E.FLIGHT.waterHeight+1);assert.equal(s.onWater,false);
  const before={pitch:s.pitch,vertical:s.verticalSpeed,heading:s.heading};E.update(s,{down:true,left:true},.02);
  assert.ok(Math.abs(s.pitch-before.pitch)<.03);assert.ok(Math.abs(s.verticalSpeed-before.vertical)<.6);assert.ok(Math.abs(s.heading-before.heading)<.02);
  s.x=0;s.z=E.WORLD.centerZ;s.y=E.WORLD.flightCeiling-.1;step(s,{up:true},1);near(s.y,E.WORLD.flightCeiling);

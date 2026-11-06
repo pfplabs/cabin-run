@@ -1,3 +1,4 @@
+import {EngineExhaust} from './engine-exhaust.js';
 import * as THREE from 'three';
 import {createFrameMetrics} from './frame-metrics.js';
 import {createRenderQuality,isSettingsInput} from './render-quality.js';
@@ -92,6 +93,7 @@ let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
 const scenicBridge=createWaterfallBridge();scene.add(scenicBridge);scenicBridge.updateMatrixWorld(true);scenicBridge.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
 const minimap=createMinimap();document.body.append(minimap.element);
 const scenicRoadKm=(E.roadLength()/1000).toFixed(2);
+const engineExhaust=new EngineExhaust();scene.add(engineExhaust);
 const flightBarrier=createFlightBarrier(),waterWake=new WaterWake();scene.add(flightBarrier,createLandingCorridor(E.LANDING_CORRIDOR),waterWake);
 let jeep,plane,propeller,propellerBlur,flightSurfaces={},wheels=[],ready=false,visual=0,mode='chase',selectedVehicle='jeep',sound=false,audioCtx,osc,gain;
 const keys=new Set(),held=new Map(),frameTimes=[];let last=0,toastLife=0,updateClock=0;
@@ -150,7 +152,7 @@ const aliases={w:'up',ArrowUp:'up',s:'down',ArrowDown:'down',a:'left',ArrowLeft:
 window.addEventListener('keydown',e=>{if(isSettingsInput(e.target))return;const key=aliases[e.key]||aliases[e.key.toLowerCase()];if(key){e.preventDefault();keys.add(key);}if(!e.repeat){if(['p','P','Escape'].includes(e.key))pause();if(['v','V'].includes(e.key))switchVehicle();if(['c','C'].includes(e.key))changeCamera();if(e.key===' '){e.preventDefault();E.action(state);}}});window.addEventListener('keyup',e=>keys.delete(aliases[e.key]||aliases[e.key.toLowerCase()]));
 window.addEventListener('blur',()=>{clearInput();if(state.status==='running')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInput();if(state.status==='running')pause();}});
 document.querySelectorAll('[data-control]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);held.set(e.pointerId,b.dataset.control);b.classList.add('pressed');});const end=e=>{held.delete(e.pointerId);b.classList.remove('pressed');};for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,end);});
-window.addEventListener('pagehide',()=>{cameraRig.dispose();environmentTarget?.dispose();pmrem.dispose();},{once:true});
+window.addEventListener('pagehide',()=>{cameraRig.dispose();engineExhaust.dispose();environmentTarget?.dispose();pmrem.dispose();},{once:true});
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderQuality.resize();});
 
 // Public read-only diagnostics; optional QA commands exist only with ?qa=1.
@@ -174,6 +176,7 @@ function frame(t){const measuredDelta=frameMetrics.begin(t);if(last&&state.statu
   for(const [name,angle] of [['PlaneAileronLeft',state.aileronAngle||0],['PlaneAileronRight',-(state.aileronAngle||0)],['PlaneElevatorLeft',-(state.elevatorAngle||0)],['PlaneElevatorRight',-(state.elevatorAngle||0)],['PlaneRudder',state.rudderAngle||0]]){const node=flightSurfaces[name];if(node)node.rotation[name==='PlaneRudder'?'y':'x']=THREE.MathUtils.clamp(angle,-.349,.349);}
   if(state.phase==='jeep'&&state.status==='running')for(const wheel of wheels){wheel.rotation.order='YXZ';wheel.rotation.x-=state.speed*dt/.588;if(wheel.name.includes('Front'))wheel.rotation.y=-(state.steeringAngle||0);}
  }
+ engineExhaust.update(state,state.status==='running'?dt:0,plane);
  roadDust.update(state,state.status==='running'?dt:0);waterWake.update(state,state.status==='running'?dt:0);
  water.material.uniforms.time.value+=dt*.55;scenicBridge.update(visual);minimap.update(state);
  applyDaylight(daylightStateAt(visual),{skyMaterial:skyMat,sun,sunDirection,ambient,water,renderer,scene});

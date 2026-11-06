@@ -1,3 +1,4 @@
+import {advanceFlightDynamics} from './flight-dynamics.js';
 import {shorelineScale} from './shoreline.js';
 /** Pure simulation rules for a small bounded alpine lake. Distances are metres. */
 export const WORLD={scale:6,roadRadius:564,centerZ:352,northLimit:-302,flightNorthLimit:-300,flightCeiling:1400};
@@ -6,8 +7,8 @@ export const CABIN_BOUNDS={minX:-4.2,maxX:25.2,minZ:-28,maxZ:-.8,roofHeight:13};
 const jeepState=()=>({steeringAngle:0,acceleration:0,suspensionVelocity:0,groundHeight:null});
 export const FLIGHT={maxSpeed:27,waterHeight:.10,liftSpeed:10,throttleRate:.3,idleRPM:650,maxRPM:2600,startupSeconds:3,waterBrake:7};
 export const LANDING_CORRIDOR={centerX:-25,zStart:250,zEnd:40,width:36,heading:0};
-export const FLIGHT_BOUNDARY={warningRadius:2.3,normalRadius:2.5,graceRadius:2.9,hardRadius:3.2,warningNorth:WORLD.centerZ-WORLD.roadRadius*2.3,normalNorth:WORLD.centerZ-WORLD.roadRadius*2.5,graceNorth:WORLD.centerZ-WORLD.roadRadius*2.9,hardNorth:WORLD.centerZ-WORLD.roadRadius*3.2,returnSeconds:8};
-const flightState=()=>({enginePhase:'off',engineStartRemaining:0,landingStatus:'taxi',landingAligned:false,touchdownAge:-1,elevatorAngle:0,aileronAngle:0,rudderAngle:0,throttle:0,propRPM:0,verticalSpeed:0,yawRate:0,onWater:false,boundaryStatus:'inside',boundaryRemaining:FLIGHT_BOUNDARY.returnSeconds});
+export const FLIGHT_BOUNDARY={warningRadius:2.3,normalRadius:2.5,graceRadius:2.9,hardRadius:3.2,warningNorth:WORLD.centerZ-WORLD.roadRadius*2.3,normalNorth:WORLD.centerZ-WORLD.roadRadius*2.5,graceNorth:WORLD.centerZ-WORLD.roadRadius*2.9,hardNorth:WORLD.centerZ-WORLD.roadRadius*3.2,returnSeconds:18};
+const flightState=()=>({enginePhase:'off',engineStartRemaining:0,stallWarning:false,landingStatus:'taxi',landingAligned:false,touchdownAge:-1,elevatorAngle:0,aileronAngle:0,rudderAngle:0,throttle:0,propRPM:0,verticalSpeed:0,yawRate:0,onWater:false,boundaryStatus:'inside',boundaryRemaining:FLIGHT_BOUNDARY.returnSeconds});
 export const LAKE={x:0,z:352,rx:468,rz:342};
 export const BRIDGE={angle:Math.PI,halfAngle:.055,halfWidth:5.6};
 export const TUNNEL={startAngle:.08,endAngle:.36,innerHalfWidth:5.4,outerHalfWidth:11,height:6.4};
@@ -140,7 +141,8 @@ export function update(s,input,dt){
   const steps=Math.max(1,Math.ceil(dt*120-1e-9)),h=dt/steps;
   for(let i=0;i<steps;i++)updateJeep(s,input,steer,h);
  }else if(!s.parked){
-  updatePlane(s,input,steer,dt);
+  const steps=Math.max(1,Math.ceil(dt*120-1e-9)),h=dt/steps;
+  for(let i=0;i<steps;i++)updatePlane(s,input,steer,h);
  }
 }
 
@@ -242,34 +244,11 @@ function updatePlane(s,input,steer,dt){
   s.propRPM=approach(s.propRPM,FLIGHT.idleRPM+(FLIGHT.maxRPM-FLIGHT.idleRPM)*s.throttle,2.2,dt);
  }else if(s.enginePhase==='off'){s.throttle=0;s.propRPM=approach(s.propRPM,0,3,dt);}
  const recovering=s.boundaryStatus==='recovering';
- const pushBack=s.onWater&&input.reverse&&!input.boost&&!input.brake&&s.throttle<.03&&s.speed<2;
- const targetSpeed=pushBack?-1.4:recovering?Math.min(16,Math.max(12,s.throttle*FLIGHT.maxSpeed)):s.throttle*FLIGHT.maxSpeed;
- const speedDelta=(targetSpeed-s.speed)*(1-Math.exp(-.65*dt));
- s.speed=clamp(s.speed+clamp(speedDelta,-3.8*dt,3.1*dt),s.onWater?-1.4:0,FLIGHT.maxSpeed);
- if(s.onWater&&input.brake)s.speed=Math.sign(s.speed)*Math.max(0,Math.abs(s.speed)-FLIGHT.waterBrake*dt);
- if(Math.abs(s.speed)<.02&&!s.throttle&&!pushBack)s.speed=0;
- const authority=s.onWater?clamp(s.speed/4,-.35,1):clamp(s.speed/10,0,1);
- let targetYaw=steer*.65*authority;
- if(recovering){const inward=Math.atan2(-s.x,s.z-WORLD.centerZ);targetYaw=clamp(wrap(inward-s.heading)*1.4,-.65,.65);}
- s.yawRate=approach(s.yawRate,targetYaw,2.5,dt);s.heading+=s.yawRate*dt;
- s.roll=approach(s.roll,-s.yawRate/.65*(s.onWater?.055:.42),3,dt);
- const pitchInput=(input.up?1:0)-(input.down?1:0);
- s.elevatorAngle=approach(s.elevatorAngle,pitchInput*.22,6,dt);
- s.aileronAngle=approach(s.aileronAngle,steer*.25,6,dt);
- s.rudderAngle=approach(s.rudderAngle,steer*.22,6,dt);
- const flaring=!s.onWater&&s.y<3.5&&s.verticalSpeed<0&&s.speed<20&&pitchInput<1&&lakeRadius(s.x,s.z)<.98;
- let targetPitch=pitchInput*(s.onWater&&s.speed<FLIGHT.liftSpeed?.075:.3);
- if(flaring)targetPitch=Math.max(.045,targetPitch);
- s.pitch=approach(s.pitch,targetPitch,2,dt);
- if(s.onWater&&engineReady&&s.speed>=FLIGHT.liftSpeed&&s.pitch>.05)s.onWater=false;
- // A gentle flare cushions water contact; no scripted position jump or forced landing.
- let climb=s.onWater?0:clamp(Math.sin(s.pitch)*s.speed,-7,7)-(s.speed<8?(8-s.speed)*.2:0);
- if(flaring)climb=-clamp((s.y-FLIGHT.waterHeight)*.7,.25,1.2);
+ advanceFlightDynamics(s,input,steer,dt,{flight:FLIGHT,recovering,inward:wrap(Math.atan2(-s.x,s.z-WORLD.centerZ)-s.heading)});
  const ahead=(s.speed<0?-1:1)*Math.max(8,Math.abs(s.speed)*1.25),forwardX=Math.sin(s.heading),forwardZ=-Math.cos(s.heading);
  const aheadX=s.x+forwardX*ahead,aheadZ=s.z+forwardZ*ahead;
  const aheadClearance=s.onWater&&lakeRadius(aheadX,aheadZ)<.995?FLIGHT.waterHeight:flightClearance(aheadX,aheadZ);
- if(aheadClearance>s.y&&(!s.onWater||s.speed>FLIGHT.liftSpeed*.8))climb=Math.max(climb,clamp((aheadClearance-s.y)*1.6,0,10));
- s.verticalSpeed=approach(s.verticalSpeed,climb,2.2,dt);
+ if(aheadClearance>s.y&&(!s.onWater||s.speed>FLIGHT.liftSpeed*.8))s.verticalSpeed=approach(s.verticalSpeed,Math.max(s.verticalSpeed,clamp((aheadClearance-s.y)*1.6,0,10)),2.2,dt);
  const nextX=s.x+forwardX*s.speed*dt,nextZ=s.z+forwardZ*s.speed*dt;
  const floatHalfX=Math.abs(Math.cos(s.heading))*1.7+Math.abs(Math.sin(s.heading))*3.3,floatHalfZ=Math.abs(Math.sin(s.heading))*1.7+Math.abs(Math.cos(s.heading))*3.3;
  const hitPier=s.onWater&&nextX+floatHalfX>DOCK_BOUNDS.minX&&nextX-floatHalfX<DOCK_BOUNDS.maxX&&nextZ+floatHalfZ>DOCK_BOUNDS.minZ&&nextZ-floatHalfZ<DOCK_BOUNDS.maxZ;
