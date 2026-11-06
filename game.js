@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import {createFrameMetrics} from './frame-metrics.js';
+import {createRenderQuality,isSettingsInput} from './render-quality.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {CameraRig} from './camera-rig.js';
 import {CameraObstruction} from './camera-collision.js';
@@ -28,6 +30,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWid
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
+const frameMetrics=createFrameMetrics(renderer);let benchmarkView=null;
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x9fbac5,.00065);
 const camera=new THREE.PerspectiveCamera(49,innerWidth/innerHeight,.2,6000);
 camera.position.set(-49,24,55);camera.lookAt(0,4,-7);
@@ -41,8 +44,8 @@ const sun=new THREE.DirectionalLight(0xffebd4,3.1);sun.position.copy(sunDirectio
 const skyMat=createSkyMaterial(),skyGeometry=new THREE.SphereGeometry(1000,32,16);
 const sky=new THREE.Mesh(skyGeometry,skyMat);sky.frustumCulled=false;scene.add(sky);scene.background=null;
 const environmentScene=new THREE.Scene(),environmentSky=new THREE.Mesh(skyGeometry,skyMat);environmentSky.frustumCulled=false;environmentScene.add(environmentSky);
-const pmrem=new THREE.PMREMGenerator(renderer);let environmentTarget=null,lastEnvironmentRefresh=-Infinity;
-function refreshSkyEnvironment(){const next=pmrem.fromScene(environmentScene,.025,.1,6000);scene.environment=next.texture;environmentTarget?.dispose();environmentTarget=next;}
+const pmrem=new THREE.PMREMGenerator(renderer);let environmentTarget=null,lastEnvironmentRefresh=-Infinity;const environmentMetrics={refreshes:0,lastCPUGenerationMs:null};
+function refreshSkyEnvironment(){const started=performance.now();const next=pmrem.fromScene(environmentScene,.025,.1,6000);scene.environment=next.texture;environmentTarget?.dispose();environmentTarget=next;environmentMetrics.refreshes++;environmentMetrics.lastCPUGenerationMs=performance.now()-started;}
 const textureLoader=new THREE.TextureLoader();
 function surfaceMap(file,{color=false,repeat=[1,1],flipY=true}={}){
  const t=textureLoader.load('./assets/pbr/'+file);t.wrapS=t.wrapT=THREE.RepeatWrapping;
@@ -53,6 +56,7 @@ function surfaceMap(file,{color=false,repeat=[1,1],flipY=true}={}){
 // Live planar reflections and wave normals. No painted-background illusion.
 const normals=surfaceMap('waternormals.jpg');
 const water=createLakeWater({normals,sunDirection,lake:E.LAKE,quality:innerWidth<700?'low':'high'});scene.add(water);
+const reflectWater=water.onBeforeRender;let reflectionProbe=true;water.onBeforeRender=function(...args){if(reflectionProbe)reflectWater.apply(this,args);};
 
 // Lake terrain, paved scenic road and distant mountain basin are generated meshes.
 const landHeight=landscapeHeight;
@@ -89,11 +93,15 @@ const flightBarrier=createFlightBarrier(),waterWake=new WaterWake();scene.add(fl
 let jeep,plane,propeller,propellerBlur,flightSurfaces={},wheels=[],ready=false,visual=0,mode='chase',selectedVehicle='jeep',sound=false,audioCtx,osc,gain;
 const keys=new Set(),held=new Map(),frameTimes=[];let last=0,toastLife=0,updateClock=0;
 const woodMaps={map:surfaceMap('hardwood2_diffuse.jpg',{color:true,flipY:false}),bumpMap:surfaceMap('hardwood2_bump.jpg',{flipY:false}),roughnessMap:surfaceMap('hardwood2_roughness.jpg',{flipY:false})};
+const renderQuality=createRenderQuality({renderer,scene,onChange:settings=>{frameMetrics.reset();$('#quality-status').textContent=`${settings.preset[0].toUpperCase()+settings.preset.slice(1)} · textures ${settings.texturesEnabled?'on':'off'}`;}});
+$('#quality-preset').addEventListener('change',event=>renderQuality.setPreset(event.target.value));
+$('#surface-textures').addEventListener('change',event=>renderQuality.setTextures(event.target.checked));
+$('#render-settings').addEventListener('focusin',clearInput);
 new GLTFLoader().load('./assets/northbound.glb',gltf=>{
  scene.add(gltf.scene);gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];for(let i=0;i<mats.length;i++){let m=mats[i];if(/cedar|deck|timber/i.test(m.name)){Object.assign(m,woodMaps);m.color.set(/deck/i.test(m.name)?0x968575:0xd1b395);m.bumpScale=.045;m.roughness=.82;m.needsUpdate=true;}if(/glazing/i.test(m.name)){const glass=new THREE.MeshPhysicalMaterial({name:m.name,color:0xb3c4c3,roughness:.095,metalness:0,transmission:.30,thickness:.12,ior:1.5,transparent:true,opacity:.88,envMapIntensity:1.35,side:THREE.DoubleSide});mats[i]=glass;}if(/Granite/i.test(m.name)){const stone=createRockMaterial();stone.name=m.name;mats[i]=stone;}if(/jeep paint|Floatplane yellow/i.test(m.name)){const paint=new THREE.MeshPhysicalMaterial();THREE.MeshStandardMaterial.prototype.copy.call(paint,m);paint.clearcoat=.55;paint.clearcoatRoughness=.22;paint.roughness=.35;mats[i]=paint;}if(/Aluminium/i.test(m.name)){m.metalness=.92;m.roughness=.29;}}o.material=Array.isArray(o.material)?mats:mats[0];if(/Meadow terrain|Gravel track/.test(o.name)||/Meadow|Interior shadow|Pine needles|Sunlit needles|Pine bark/.test(mats[0]?.name)||/Gravel road/.test(mats[0]?.name))o.visible=false;}
  });
  applyHeroMaterials(gltf.scene);
- applyVehicleFidelity(gltf.scene);
+ applyVehicleFidelity(gltf.scene);renderQuality.register(gltf.scene);
  jeep=gltf.scene.getObjectByName('JeepRoot');plane=gltf.scene.getObjectByName('PlaneRoot');propeller=gltf.scene.getObjectByName('Propeller');wheels=['LeftFront','LeftRear','RightFront','RightRear'].map(n=>gltf.scene.getObjectByName('JeepWheel'+n)).filter(Boolean);
  if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
  plane.position.set(E.DOCK.x,E.FLIGHT.waterHeight,E.DOCK.z);plane.rotation.set(0,Math.PI,0);
@@ -110,7 +118,7 @@ new GLTFLoader().load('./assets/northbound.glb',gltf=>{
 
 function clearInput(){keys.clear();held.clear();document.querySelectorAll('[data-control]').forEach(b=>b.classList.remove('pressed'));}
 function toast(text){$('#toast').textContent=text;$('#toast').classList.add('visible');toastLife=4;}
-function start(){if(!ready)return;E.begin(state,selectedVehicle);mode='chase';$('#camera').innerHTML='Orbit <b>C</b>';clearInput();$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').disabled=false;$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='jeep'?'Leave your parking bay toward the access aisle. Drive Jeep / Fly Plane changes vehicle.':'Space starts the engine. Shift adds power. At idle, B pushes backward on water.');}
+function start(){if(!ready)return;benchmarkView=null;E.begin(state,selectedVehicle);mode='chase';$('#camera').innerHTML='Orbit <b>C</b>';clearInput();$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').disabled=false;$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();cameraRig.setMode(mode,state);cameraRig.reset(state);cameraRig.setEnabled(true);sync();toast(state.phase==='jeep'?'Leave your parking bay toward the access aisle. Drive Jeep / Fly Plane changes vehicle.':'Space starts the engine. Shift adds power. At idle, B pushes backward on water.');}
 function pause(){if(!['running','paused'].includes(state.status))return;E.togglePause(state);clearInput();cameraRig.setEnabled(state.status==='running');if(state.status==='paused'){
   $('#title').innerHTML='Stay a<br>little longer.';$('#description').textContent='Your drive or flight is paused. The lake can wait.';$('#start').innerHTML='Back to the lake <span>↗</span>';$('#restart').classList.remove('hidden');$('#steps').classList.add('hidden');$('#overlay').classList.remove('hidden');document.body.classList.add('intro-open');$('#pause').textContent='▶';$('#pause').setAttribute('aria-label','Resume game');
  }else{$('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');$('#pause').textContent='Ⅱ';$('#pause').setAttribute('aria-label','Pause game');canvas.focus();}}
@@ -133,22 +141,28 @@ function sync(){
 $('#start').addEventListener('click',()=>state.status==='paused'?pause():start());$('#restart').addEventListener('click',start);$('#pause').addEventListener('click',pause);$('#drive').addEventListener('click',()=>switchVehicle('jeep'));$('#fly').addEventListener('click',()=>switchVehicle('plane'));$('#camera').addEventListener('click',changeCamera);$('#interact').addEventListener('click',()=>{E.action(state);canvas.focus();sync();});$('#touch-action').addEventListener('click',()=>{E.action(state);canvas.focus();sync();});
 $('#sound').addEventListener('click',()=>{sound=!sound;$('#sound').textContent=sound?'Sound on':'Sound off';$('#sound').setAttribute('aria-pressed',String(sound));if(sound&&!audioCtx){audioCtx=new AudioContext();osc=audioCtx.createOscillator();gain=audioCtx.createGain();osc.type='triangle';osc.connect(gain);gain.connect(audioCtx.destination);gain.gain.value=0;osc.start();}if(audioCtx)audioCtx.resume();});
 const aliases={w:'up',ArrowUp:'up',s:'down',ArrowDown:'down',a:'left',ArrowLeft:'left',d:'right',ArrowRight:'right',Shift:'boost',Control:'brake',b:'reverse'};
-window.addEventListener('keydown',e=>{if(e.target instanceof HTMLButtonElement&&[' ','Enter'].includes(e.key))return;const key=aliases[e.key]||aliases[e.key.toLowerCase()];if(key){e.preventDefault();keys.add(key);}if(!e.repeat){if(['p','P','Escape'].includes(e.key))pause();if(['v','V'].includes(e.key))switchVehicle();if(['c','C'].includes(e.key))changeCamera();if(e.key===' '){e.preventDefault();E.action(state);}}});window.addEventListener('keyup',e=>keys.delete(aliases[e.key]||aliases[e.key.toLowerCase()]));
+window.addEventListener('keydown',e=>{if(isSettingsInput(e.target))return;const key=aliases[e.key]||aliases[e.key.toLowerCase()];if(key){e.preventDefault();keys.add(key);}if(!e.repeat){if(['p','P','Escape'].includes(e.key))pause();if(['v','V'].includes(e.key))switchVehicle();if(['c','C'].includes(e.key))changeCamera();if(e.key===' '){e.preventDefault();E.action(state);}}});window.addEventListener('keyup',e=>keys.delete(aliases[e.key]||aliases[e.key.toLowerCase()]));
 window.addEventListener('blur',()=>{clearInput();if(state.status==='running')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInput();if(state.status==='running')pause();}});
 document.querySelectorAll('[data-control]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);held.set(e.pointerId,b.dataset.control);b.classList.add('pressed');});const end=e=>{held.delete(e.pointerId);b.classList.remove('pressed');};for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,end);});
 window.addEventListener('pagehide',()=>{cameraRig.dispose();environmentTarget?.dispose();pmrem.dispose();},{once:true});
-window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderQuality.resize();});
 
 // Public read-only diagnostics; optional QA commands exist only with ?qa=1.
-window.cabinDiagnostics=()=>({build:'large-lake-startup-landing',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},grass:{...forestGrass.userData.grass},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
-if(new URLSearchParams(location.search).has('qa'))window.cabinQA={setGrassDensity:forestGrass.setDensity,setGrassWind:forestGrass.setWind,state,start,pause,switchVehicle,action:()=>E.action(state),setMode:m=>{mode=m;cameraRig.setMode(mode,state);},input:keys};
+window.cabinDiagnostics=()=>({environment:{...environmentMetrics},fullFrame:frameMetrics.snapshot(),quality:renderQuality.settings(),benchmarkView,cameraPosition:camera.position.toArray(),build:'large-lake-startup-landing',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},grass:{...forestGrass.userData.grass},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
+if(new URLSearchParams(location.search).has('qa'))window.cabinQA={benchmark:name=>{
+ if(!['jeep','lake','cabin'].includes(name))throw new RangeError('Unknown benchmark view');
+ clearInput();cameraRig.setEnabled(false);E.begin(state,name==='lake'?'plane':'jeep');benchmarkView=name;visual=0;lastEnvironmentRefresh=-Infinity;
+ const views={jeep:[[-32,7,-3],[-16,2,-9]],lake:[[-40,9,613],[-40,1,591]],cabin:[[-49,24,55],[0,4,-7]]};
+ camera.position.set(...views[name][0]);camera.lookAt(...views[name][1]);camera.updateMatrixWorld();
+ $('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');frameMetrics.reset();
+ },textureAudit:renderQuality.audit,setReflectionProbe:enabled=>{reflectionProbe=!!enabled;},setQuality:renderQuality.setPreset,setTextures:renderQuality.setTextures,resetMetrics:frameMetrics.reset,setGrassDensity:forestGrass.setDensity,setGrassWind:forestGrass.setWind,state,start,pause,switchVehicle,action:()=>E.action(state),setMode:m=>{mode=m;cameraRig.setMode(mode,state);},input:keys};
 
-function frame(t){if(last&&state.status==='running'){frameTimes.push(t-last);if(frameTimes.length>240)frameTimes.shift();}const dt=Math.min((t-last)/1000||0,.05);last=t;visual+=dt;const active=new Set([...keys,...held.values()]);const input=Object.fromEntries([...active].map(k=>[k,true]));E.update(state,input,dt);
+function frame(t){const measuredDelta=frameMetrics.begin(t);if(last&&state.status==='running'){frameTimes.push(t-last);if(frameTimes.length>240)frameTimes.shift();}const dt=benchmarkView?0:Math.min((t-last)/1000||0,.05);last=t;visual+=dt;const active=new Set([...keys,...held.values()]);const input=Object.fromEntries([...active].map(k=>[k,true]));E.update(state,input,dt);
  if(ready){
   if(state.status!=='ready'){
    const vehicle=state.phase==='jeep'?jeep:plane;vehicle.position.set(state.x,state.y,state.z);vehicle.rotation.set(state.pitch,-state.heading,state.roll,'YXZ');
    const parked=state.phase==='jeep'?plane:jeep;parked.position.set(...(state.phase==='jeep'?[E.DOCK.x,E.FLIGHT.waterHeight,E.DOCK.z]:[E.HOME.x,E.terrainHeight(E.HOME.x,E.HOME.z),E.HOME.z]));parked.rotation.set(0,state.phase==='jeep'?Math.PI:Math.PI/2,0);
-   cameraRig.setEnabled(state.status==='running');cameraRig.update(state,dt);
+   if(!benchmarkView){cameraRig.setEnabled(state.status==='running');cameraRig.update(state,dt);}
   }
   if(propeller){const rpm=state.phase==='plane'&&!state.parked?(state.propRPM||0):0;if(state.status==='running')propeller.rotation.z=(propeller.rotation.z+dt*rpm*Math.PI*2/60)%(Math.PI*2);if(propellerBlur){propellerBlur.material.uniforms.amount.value=THREE.MathUtils.clamp((rpm-700)/1500,0,1);propellerBlur.material.uniforms.phase.value=propeller.rotation.z*.27;}}
   for(const [name,angle] of [['PlaneAileronLeft',state.aileronAngle||0],['PlaneAileronRight',-(state.aileronAngle||0)],['PlaneElevatorLeft',-(state.elevatorAngle||0)],['PlaneElevatorRight',-(state.elevatorAngle||0)],['PlaneRudder',state.rudderAngle||0]]){const node=flightSurfaces[name];if(node)node.rotation[name==='PlaneRudder'?'y':'x']=THREE.MathUtils.clamp(angle,-.349,.349);}
@@ -165,6 +179,6 @@ function frame(t){if(last&&state.status==='running'){frameTimes.push(t-last);if(
  if(audioCtx){const running=sound&&state.status==='running'&&!state.parked&&(state.phase!=='plane'||state.enginePhase!=='off');gain.gain.setTargetAtTime(running?.022:0,audioCtx.currentTime,.15);osc.frequency.setTargetAtTime(state.phase==='plane'?30+(state.propRPM||0)/18:35+Math.abs(state.speed)*8,audioCtx.currentTime,.1);}
  const lightTarget=state.status==='ready'||mode==='cabin'?new THREE.Vector3(0,2,-7):new THREE.Vector3(state.x,state.y,state.z);sun.target.position.lerp(lightTarget,Math.min(1,dt*2));sun.position.copy(sun.target.position).addScaledVector(sunDirection,110);
  forest.updateLOD(camera.position,camera);forestGrass.update(visual,camera.position);
- renderer.render(scene,camera);requestAnimationFrame(frame);
+ renderer.render(scene,camera);frameMetrics.end(document.hidden?null:measuredDelta);requestAnimationFrame(frame);
 }requestAnimationFrame(frame);
 

@@ -16,7 +16,11 @@ export function createLakeWater({normals,sunDirection,lake,quality='high'}={}){
  water.userData.water={quality:quality==='low'?'low':'high',reflectionResolution:resolution,extraDrawCalls:0};
  water.material.uniforms.size.value=3.5;
  const replace=(source,from,to)=>{if(!source.includes(from))throw new Error('Water shader changed: '+from);return source.replace(from,to);};
- let shader=SHORELINE_GLSL+water.material.fragmentShader;
+ water.userData.surfaceTexturesNote='Ripple normal texture; reflection is preserved';
+ water.material.userData.surfaceTexturesEnabled={value:1};
+ water.material.uniforms.surfaceTexturesEnabled=water.material.userData.surfaceTexturesEnabled;
+ let shader='uniform float surfaceTexturesEnabled;\n'+SHORELINE_GLSL+water.material.fragmentShader;
+ shader=replace(shader,'vec4 getNoise( vec2 uv ) {','vec4 getNoise( vec2 uv ) { if(surfaceTexturesEnabled<.5)return vec4(0.,0.,1.,0.);');
  shader=replace(shader,'vec4 noise = getNoise( worldPosition.xz * size );',`
   vec2 shoreUV=vec2(worldPosition.x/${lake.rx.toFixed(1)},(worldPosition.z-${lake.z.toFixed(1)})/${lake.rz.toFixed(1)});
   float shoreRadius=length(shoreUV)/lakeShoreScale(atan(shoreUV.x,-shoreUV.y));

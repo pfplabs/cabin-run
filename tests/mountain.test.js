@@ -39,5 +39,5 @@ test('pavement and lake-facing tunnel apertures retain their previous ground',()
 test('summit snow uses existing surface fields without extra texture samplers',()=>{
  const m=createTerrainMaterial({grassMap:new THREE.Texture()}),s={vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader,uniforms:{}};
  m.onBeforeCompile(s);assert.match(s.fragmentShader,/smoothstep\(210\.,275\./);assert.match(s.fragmentShader,/lmGround=mix\(lmGround,lmSnowColour,lmSnow\)/);
- assert.deepEqual(Object.keys(s.uniforms).sort(),['lmGrass','lmLake','lmRelief','lmSurface']);m.dispose();
+ assert.deepEqual(Object.keys(s.uniforms).sort(),['lmGrass','lmLake','lmRelief','lmSurface','lmTexturesEnabled']);m.dispose();
 });

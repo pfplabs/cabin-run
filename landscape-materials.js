@@ -41,7 +41,9 @@ varying vec3 vLMWorld;
 varying vec3 vLMWorldNormal;
 uniform sampler2D lmSurface;
 uniform float lmRelief;
+uniform float lmTexturesEnabled;
 vec4 lmTriplanar(vec3 p,vec3 w){
+ if(lmTexturesEnabled<.5)return vec4(.5);
  return texture2D(lmSurface,p.yz)*w.x+texture2D(lmSurface,p.xz)*w.y+texture2D(lmSurface,p.xy)*w.z;
 }
 vec3 lmBumpNormal(vec3 n,float h){
@@ -69,9 +71,11 @@ const fields=`
  float lmRough=clamp(.85+(lmLarge.a-.5)*.14+(lmFine.a-.5)*.08*lmDetail,.72,.97);
 `;
 function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:114},relief=1}={}){
- material.customProgramCacheKey=()=>`northbound-landscape-v3-${terrain?'terrain':'rock'}`;
+ material.userData.surfaceTexturesEnabled={value:1};
+ material.customProgramCacheKey=()=>`northbound-landscape-v4-${terrain?'terrain':'rock'}`;
  material.userData.landscapeSurface={kind:terrain?'terrain':'rock',worldUnits:'metres',externalTextures:grassMap?1:0};
  material.onBeforeCompile=shader=>{
+  shader.uniforms.lmTexturesEnabled=material.userData.surfaceTexturesEnabled;
   shader.uniforms.lmSurface={value:shared()};shader.uniforms.lmRelief={value:relief};
   shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vLMWorld;\nvarying vec3 vLMWorldNormal;');
   shader.vertexShader=shader.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
@@ -83,18 +87,18 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
    vLMWorldNormal=inverseTransformDirection(transformedNormal,viewMatrix);
   `);
   shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\n'+common+(terrain?'\nuniform sampler2D lmGrass;\nuniform vec4 lmLake;\n':''));
-  let colour=fields+'\n diffuseColor.rgb*=lmRock;';
+  let colour=fields+'\n if(lmTexturesEnabled<.5){lmRock=vec3(.31,.325,.31);lmHeight=0.;lmRough=.85;} diffuseColor.rgb*=lmRock;';
   if(terrain){
    shader.uniforms.lmGrass={value:grassMap};shader.uniforms.lmLake={value:new THREE.Vector4(lake.x??0,lake.z,lake.rx,lake.rz)};
    colour=fields+`
     // Blended rotated 6 m / 11 m ground sampling hides large repeated squares.
     vec2 lmUV=vLMWorld.xz/6.;
-    vec3 lmGrassA=texture2D(lmGrass,lmUV).rgb;
-    vec3 lmGrassB=texture2D(lmGrass,mat2(.8,-.6,.6,.8)*vLMWorld.xz/11.+vec2(.31,.67)).rgb;
+    vec3 lmGrassA=lmTexturesEnabled>.5?texture2D(lmGrass,lmUV).rgb:vec3(.13,.20,.075);
+    vec3 lmGrassB=lmTexturesEnabled>.5?texture2D(lmGrass,mat2(.8,-.6,.6,.8)*vLMWorld.xz/11.+vec2(.31,.67)).rgb:lmGrassA;
     vec3 lmGrassColour=mix(lmGrassA,lmGrassB,.28)*mix(.93,1.08,lmLarge.r);
     // Broad meadow communities interrupt the uniform lawn at valley scale.
     // Reuse the packed surface sampler: one extra lookup, no texture allocation.
-    vec4 lmMeadow=texture2D(lmSurface,vLMWorld.xz/145.+vec2(.17,.63));
+    vec4 lmMeadow=lmTexturesEnabled>.5?texture2D(lmSurface,vLMWorld.xz/145.+vec2(.17,.63)):vec4(.5);
     float lmDry=smoothstep(.43,.73,lmMeadow.r);
     float lmGrassLuma=dot(lmGrassColour,vec3(.2126,.7152,.0722));
     lmGrassColour=mix(lmGrassColour,vec3(lmGrassLuma)*vec3(1.12,1.05,.82),.20+lmDry*.28);
@@ -123,7 +127,7 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
     lmRough=mix(.96,lmRough,lmRockMask);
     lmRough=mix(lmRough,.72,lmShore*(1.-smoothstep(-.1,.45,vLMWorld.y)));
     lmRough=mix(lmRough,.92,lmSnow);
-    lmHeight*=1.-lmSnow*.75;
+    lmHeight*=(1.-lmSnow*.75)*lmTexturesEnabled;
    `;
   }
   shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',colour);

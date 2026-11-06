@@ -35,7 +35,7 @@ export function createRoadSigns(heightAt){
   node.position.set(sign.x,heightAt(sign.x,sign.z),sign.z);node.rotation.y=sign.rotation;
   const post=new THREE.Mesh(new THREE.CylinderGeometry(.065,.085,3.5,8),metal);post.position.y=1.75;
   const board=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.6,.09),backing);board.position.y=3.1;
-  const face=new THREE.Mesh(new THREE.PlaneGeometry(3.08,1.48),new THREE.MeshStandardMaterial({map:signMap(sign),roughness:.65}));face.position.set(0,3.1,.051);
+  const face=new THREE.Mesh(new THREE.PlaneGeometry(3.08,1.48),new THREE.MeshStandardMaterial({map:signMap(sign),roughness:.65}));face.material.userData.keepColorMap=true;face.position.set(0,3.1,.051);
   node.add(post,board,face);post.castShadow=board.castShadow=true;group.add(node);
  }
  return group;
