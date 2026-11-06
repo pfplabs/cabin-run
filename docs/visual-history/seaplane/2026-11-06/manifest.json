@@ -1,0 +1,47 @@
+{
+  "archived_utc": "2026-11-06T05:47:08.032300+00:00",
+  "status": "internal evidence only; not published",
+  "original_reference": "Unavailable in this checkout; no substitute presented as original.",
+  "captures": [
+    {
+      "stage": "01-float-hull-intermediate",
+      "status": "intermediate; not user-approved final",
+      "file": "01-float-hull-intermediate.jpg",
+      "source": "/Users/jarvis/Documents/Codex/2026-11-05/task-5/evidence/floatplane-hulls.jpg",
+      "source_file_modified_utc": "2026-11-06T05:05:31.308668+00:00",
+      "associated_commit": "0938d41a3f568831439a0f4201bf814321f7a76b",
+      "provenance": "Earlier hull pass; commit association documented by vehicle worker.",
+      "sha256": "091c7ebe84b6716ce19830c0615e77a5a85d6bbb381cab22306d81ab265f09fb"
+    },
+    {
+      "stage": "02-body-cockpit-intermediate",
+      "status": "intermediate; not user-approved final",
+      "file": "02-body-cockpit-intermediate.jpg",
+      "source": "/Users/jarvis/Documents/Codex/2026-11-05/task-5/evidence/plane-body-rebuild.jpg",
+      "source_file_modified_utc": "2026-11-06T05:30:20.693314+00:00",
+      "associated_commit": "4d7781db04bc9875b5fe844c3d6a50a03d004b22",
+      "provenance": "Earlier body and cockpit pass; associated with vehicle worker rebuild; not recaptured here.",
+      "sha256": "b290b00dd0e21bf4fb7f7a9e65df849a1be271fc1c94ffe4726db7761692fa3f"
+    },
+    {
+      "stage": "03-airframe-front-intermediate",
+      "status": "intermediate; not user-approved final",
+      "file": "03-airframe-front-intermediate.png",
+      "source": "/Users/jarvis/Documents/Codex/2026-11-05/task-11/evidence/seaplane-front-quarter.png",
+      "source_file_modified_utc": "2026-11-06T05:35:18.331027+00:00",
+      "associated_commit": "ce31d0973fa9add209ab9d76bcc759d1d7eb8a07",
+      "provenance": "Front quarter capture verified in this task.",
+      "sha256": "ce7aa95260face071cff2e4bbd679dd80666843780dd08be42e615162674afb5"
+    },
+    {
+      "stage": "03-airframe-rear-intermediate",
+      "status": "intermediate; not user-approved final",
+      "file": "03-airframe-rear-intermediate.png",
+      "source": "/Users/jarvis/Documents/Codex/2026-11-05/task-11/evidence/seaplane-rear-quarter.png",
+      "source_file_modified_utc": "2026-11-06T05:35:10.318094+00:00",
+      "associated_commit": "ce31d0973fa9add209ab9d76bcc759d1d7eb8a07",
+      "provenance": "Rear quarter capture verified in this task.",
+      "sha256": "36e83e0230ef26d16e31dc621a6f9b531f139a14ff2270dcdc6a815ada464c6e"
+    }
+  ]
+}
