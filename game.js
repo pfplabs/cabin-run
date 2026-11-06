@@ -158,11 +158,11 @@ window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camer
 // Public read-only diagnostics; optional QA commands exist only with ?qa=1.
 window.cabinDiagnostics=()=>({environment:{...environmentMetrics},fullFrame:frameMetrics.snapshot(),quality:renderQuality.settings(),benchmarkView,cameraPosition:camera.position.toArray(),build:'large-lake-startup-landing',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},grass:{...forestGrass.userData.grass},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
 if(new URLSearchParams(location.search).has('qa'))window.cabinQA={benchmark:name=>{
- if(!['jeep','lake','cabin'].includes(name))throw new RangeError('Unknown benchmark view');
+ if(!['jeep','lake','cabin','waterfall'].includes(name))throw new RangeError('Unknown benchmark view');
  clearInput();cameraRig.setEnabled(false);E.begin(state,name==='lake'?'plane':'jeep');benchmarkView=name;visual=0;lastEnvironmentRefresh=-Infinity;
- const views={jeep:[[-32,7,-3],[-16,2,-9]],lake:[[-40,9,613],[-40,1,591]],cabin:[[-49,24,55],[0,4,-7]]};
+ const views={jeep:[[-32,7,-3],[-16,2,-9]],lake:[[-40,9,613],[-40,1,591]],cabin:[[-49,24,55],[0,4,-7]],waterfall:[[52,37,937],[0,29,991]]};
  camera.position.set(...views[name][0]);camera.lookAt(...views[name][1]);camera.updateMatrixWorld();
- $('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');frameMetrics.reset();
+ $('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');sync();frameMetrics.reset();
  },textureAudit:renderQuality.audit,setReflectionProbe:enabled=>{reflectionProbe=!!enabled;},setQuality:renderQuality.setPreset,setTextures:renderQuality.setTextures,resetMetrics:frameMetrics.reset,setGrassDensity:forestGrass.setDensity,setGrassWind:forestGrass.setWind,state,start,pause,switchVehicle,action:()=>E.action(state),setMode:m=>{mode=m;cameraRig.setMode(mode,state);},input:keys};
 
 function frame(t){const measuredDelta=frameMetrics.begin(t);if(last&&state.status==='running'){frameTimes.push(t-last);if(frameTimes.length>240)frameTimes.shift();}const dt=benchmarkView?0:Math.min((t-last)/1000||0,.05);last=t;visual+=dt;const active=new Set([...keys,...held.values()]);const input=Object.fromEntries([...active].map(k=>[k,true]));E.update(state,input,dt);
