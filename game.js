@@ -12,7 +12,7 @@ import {createRoadRibbonGeometry,createGravelMaterial,clipRibbonOutsideRoad} fro
 import {RoadDust} from './road-dust.js';
 import {createSkyMaterial,daylightStateAt,applyDaylight} from './daylight-cycle.js';
 import {createLakeWater} from './lake-water.js';
-import * as E from './engine.js';
+import * as E from './engine.js?v=dock-berth-1';
 import {createWaterfallBridge} from './waterfall-bridge.js';
 import {createMinimap} from './minimap.js';
 import {applyHeroMaterials} from './hero-materials.js';
@@ -114,7 +114,7 @@ new GLTFLoader().load('./assets/northbound.glb',gltf=>{
  if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
  const cockpitCamera=new CockpitCamera({jeep,plane});cameraRig.applyCockpit=(camera,state,active)=>cockpitCamera.apply(camera,state,active);
  renderQuality.register(gltf.scene);
- plane.position.set(E.DOCK.x,E.FLIGHT.waterHeight,E.DOCK.z);plane.rotation.set(0,Math.PI,0);
+ plane.position.set(E.PLANE_BERTH.x,E.FLIGHT.waterHeight,E.PLANE_BERTH.z);plane.rotation.set(0,-E.PLANE_BERTH.heading,0);
  if(propeller){propellerBlur=createPropellerBlur();propeller.add(propellerBlur);}
  for(const name of ['PlaneAileronLeft','PlaneAileronRight','PlaneElevatorLeft','PlaneElevatorRight','PlaneRudder'])flightSurfaces[name]=gltf.scene.getObjectByName(name);
  gltf.scene.updateMatrixWorld(true);gltf.scene.traverse(o=>{if(!o.isMesh||!o.visible)return;let p=o;while(p){if(p===jeep||p===plane)return;p=p.parent;}cameraObstacles.push(o);});
@@ -162,7 +162,7 @@ window.cabinDiagnostics=()=>({environment:{...environmentMetrics},fullFrame:fram
 if(new URLSearchParams(location.search).has('qa'))window.cabinQA={benchmark:name=>{
  if(!['jeep','lake','cabin','waterfall'].includes(name))throw new RangeError('Unknown benchmark view');
  clearInput();cameraRig.setEnabled(false);E.begin(state,name==='lake'?'plane':'jeep');benchmarkView=name;visual=0;lastEnvironmentRefresh=-Infinity;
- const views={jeep:[[-32,7,-3],[-16,2,-9]],lake:[[-40,9,613],[-40,1,591]],cabin:[[-49,24,55],[0,4,-7]],waterfall:[[52,37,937],[0,29,991]]};
+ const views={jeep:[[-32,7,-3],[-16,2,-9]],lake:[[-45,7,43],[-30,1,30]],cabin:[[-49,24,55],[0,4,-7]],waterfall:[[52,37,937],[0,29,991]]};
  camera.position.set(...views[name][0]);camera.lookAt(...views[name][1]);camera.updateMatrixWorld();
  $('#overlay').classList.add('hidden');document.body.classList.remove('intro-open');sync();frameMetrics.reset();
  },textureAudit:renderQuality.audit,setReflectionProbe:enabled=>{reflectionProbe=!!enabled;},setQuality:renderQuality.setPreset,setTextures:renderQuality.setTextures,resetMetrics:frameMetrics.reset,setGrassDensity:forestGrass.setDensity,setGrassWind:forestGrass.setWind,state,start,pause,switchVehicle,action:()=>E.action(state),setMode:m=>{mode=m;cameraRig.setMode(mode,state);},input:keys};
@@ -171,7 +171,7 @@ function frame(t){const measuredDelta=frameMetrics.begin(t);if(last&&state.statu
  if(ready){
   if(state.status!=='ready'){
    const vehicle=state.phase==='jeep'?jeep:plane;vehicle.position.set(state.x,state.y,state.z);vehicle.rotation.set(state.pitch,-state.heading,state.roll,'YXZ');
-   const parked=state.phase==='jeep'?plane:jeep;parked.position.set(...(state.phase==='jeep'?[E.DOCK.x,E.FLIGHT.waterHeight,E.DOCK.z]:[E.HOME.x,E.terrainHeight(E.HOME.x,E.HOME.z),E.HOME.z]));parked.rotation.set(0,state.phase==='jeep'?Math.PI:Math.PI/2,0);
+   const parked=state.phase==='jeep'?plane:jeep;parked.position.set(...(state.phase==='jeep'?[E.PLANE_BERTH.x,E.FLIGHT.waterHeight,E.PLANE_BERTH.z]:[E.HOME.x,E.terrainHeight(E.HOME.x,E.HOME.z),E.HOME.z]));parked.rotation.set(0,state.phase==='jeep'?-E.PLANE_BERTH.heading:Math.PI/2,0);
    if(!benchmarkView){cameraRig.setEnabled(state.status==='running');cameraRig.update(state,dt);}
   }
   if(propeller){const rpm=state.phase==='plane'&&!state.parked?(state.propRPM||0):0;if(state.status==='running')propeller.rotation.z=(propeller.rotation.z+dt*rpm*Math.PI*2/60)%(Math.PI*2);if(propellerBlur){propellerBlur.material.uniforms.amount.value=THREE.MathUtils.clamp((rpm-700)/1500,0,1);propellerBlur.material.uniforms.phase.value=propeller.rotation.z*.27;}}

@@ -48,6 +48,7 @@ for(let i=0;i<=24;i++){
 for(let i=1;i<=12;i++){const a=i/12*Math.PI/2;DRIVEWAY.push({x:-38+12*Math.sin(a),z:-18-12*Math.cos(a),y:1.1});}
 DRIVEWAY.push({x:-26,z:-9,y:1.1},{x:-26,z:.5,y:1.1});
 export const DOCK={x:-23.7,z:30};
+export const PLANE_BERTH=Object.freeze({x:-30,z:30,heading:Math.PI});
 export const DOCK_BOUNDS={minX:-21.20,maxX:-14.925,minZ:2,maxZ:36,maxY:2.025};
 export const HOME={x:-16,z:-9};
 export const PARKING_APRON={x:-20,z:-9,width:17.5,length:25,cornerRadius:2};
@@ -116,7 +117,7 @@ export function switchVehicle(s,vehicle){
  if(!['jeep','plane'].includes(vehicle))return false;
  Object.assign(s,flightState(),jeepState());s.phase=vehicle;s.speed=0;s.roll=0;s.pitch=0;s.actionReady=false;s.takeoff=0;s.parked=false;s.arrived=false;
  if(vehicle==='jeep'){s.x=HOME.x;s.z=HOME.z;s.y=terrainHeight(s.x,s.z);s.heading=-Math.PI/2;}
- else {s.x=-40;s.z=591;s.y=FLIGHT.waterHeight;s.heading=0;s.onWater=true;s.propRPM=0;}
+ else {s.x=PLANE_BERTH.x;s.z=PLANE_BERTH.z;s.y=FLIGHT.waterHeight;s.heading=PLANE_BERTH.heading;s.onWater=true;s.propRPM=0;}
  return true;
 }
 export function action(s){

@@ -73,7 +73,7 @@ test('road and driveway are drivable continuously from spawn to cabin',()=>{
 });
 
 test('input-driven engine start, taxi, takeoff, corridor approach, touchdown and dock',()=>{
- const s=running('plane');assert.equal(s.enginePhase,'off');startEngine(s);
+ const s=running('plane');Object.assign(s,{x:-40,z:591,heading:0});assert.equal(s.enginePhase,'off');startEngine(s);
  let maxAltitude=0,sawApproach=false,landed=false,sawTaxi=false;
  for(let i=0;i<7500&&!s.actionReady;i++){
   const distance=Math.hypot(E.DOCK.x-s.x,E.DOCK.z-s.z),target=Math.atan2(E.DOCK.x-s.x,s.z-E.DOCK.z);
@@ -95,7 +95,7 @@ test('expanded lake is nine times the previous area and preserves cabin landmark
  near((Math.PI*E.LAKE.rx*E.LAKE.rz)/(Math.PI*156*114),9);near((Math.PI*E.LAKE.rx*E.LAKE.rz)/(Math.PI*78*57),36);
  assert.deepEqual(E.HOME,{x:-16,z:-9});assert.deepEqual(E.DOCK,{x:-23.7,z:30});
  near(E.roadRadius(0,E.WORLD.centerZ-E.WORLD.roadRadius),1);
- const jeep=running(),plane=running('plane');assert.deepEqual([jeep.x,jeep.z],[E.HOME.x,E.HOME.z]);assert.deepEqual([plane.x,plane.z],[-40,591]);
+ const jeep=running(),plane=running('plane');assert.deepEqual([jeep.x,jeep.z],[E.HOME.x,E.HOME.z]);assert.deepEqual([plane.x,plane.z],[E.PLANE_BERTH.x,E.PLANE_BERTH.z]);
 });
 test('jeep raised speed limits and floatplane limit are enforced',()=>{
  for(const [input,limit] of [[{up:true},22],[{up:true,boost:true},28],[{down:true},-6]]){
