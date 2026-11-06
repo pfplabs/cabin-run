@@ -4,6 +4,10 @@
 
 This default branch preserves the original **2D prototype** described below. Current 3D gameplay, setup instructions and verification notes are on [`feat/3d-alpine-lake`](https://github.com/pfplabs/cabin-run/tree/feat/3d-alpine-lake) and its [README](https://github.com/pfplabs/cabin-run/blob/feat/3d-alpine-lake/README.md). The 3D work has not been merged into `main`.
 
+![Current 3D development: driving the alpine lake road](https://github.com/pfplabs/cabin-run/blob/31c650634e72f6a4412cab7a1e415fd220f6e0e3/docs/images/cabin-drive-18.jpg?raw=true)
+
+*November 6, 2026 browser gameplay from the 3D feature branch, not the 2D prototype below. [View the full gallery](https://github.com/pfplabs/cabin-run/blob/feat/3d-alpine-lake/README.md#gameplay-gallery).*
+
 ## Original 2D prototype
 
 A dependency-free browser minigame inspired by a lakeside Maya/OpenGL cabin scene from 2013. All artwork is drawn procedurally in Canvas. No external assets, network calls, backend, build tools or accounts are required.
