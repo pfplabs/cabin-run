@@ -1,7 +1,7 @@
 import {shorelineScale} from './shoreline.js';
 /** Pure simulation rules for a small bounded alpine lake. Distances are metres. */
 export const WORLD={scale:6,roadRadius:564,centerZ:352,northLimit:-302,flightNorthLimit:-300,flightCeiling:1400};
-export const JEEP={maxSpeed:22,boostSpeed:28,reverseSpeed:6,wheelbase:2.8,halfTrack:.95,maxSteeringAngle:.55,maxLateralAcceleration:9,acceleration:4.8,braking:8.5};
+export const JEEP={maxSpeed:22,boostSpeed:28,reverseSpeed:6,wheelbase:2.8,halfTrack:.95,maxSteeringAngle:.55,parkingSteeringAngle:.78,maxLateralAcceleration:9,acceleration:4.8,braking:12};
 export const CABIN_BOUNDS={minX:-4.2,maxX:25.2,minZ:-28,maxZ:-.8,roofHeight:13};
 const jeepState=()=>({steeringAngle:0,acceleration:0,suspensionVelocity:0,groundHeight:null});
 export const FLIGHT={maxSpeed:27,waterHeight:.10,liftSpeed:10,throttleRate:.3,idleRPM:650,maxRPM:2600,startupSeconds:3,waterBrake:7};
@@ -146,13 +146,15 @@ function updateJeep(s,input,steer,dt){
  else if(!throttle)acceleration=-Math.sign(s.speed)*(.7+Math.abs(s.speed)*.018);
  else if(Math.abs(s.speed)>limit)acceleration=-Math.sign(s.speed)*2.5;
  else acceleration=throttle*(throttle<0?3.2:JEEP.acceleration)*(1-.4*Math.abs(s.speed)/limit);
- s.acceleration=approach(s.acceleration,acceleration,input.brake||counter?12:7,dt);
+ s.acceleration=approach(s.acceleration,acceleration,input.brake?18:counter?12:7,dt);
  s.speed+=s.acceleration*dt;
  if((input.brake||counter||!throttle)&&oldSpeed*s.speed<=0){s.speed=0;s.acceleration=0;}
  if(throttle&&!counter&&!input.brake&&Math.abs(oldSpeed)<=limit)s.speed=clamp(s.speed,-JEEP.reverseSpeed,limit);
  s.speed=clamp(s.speed,-JEEP.reverseSpeed,input.boost?JEEP.boostSpeed:Math.max(JEEP.maxSpeed,oldSpeed));
  const speed=Math.abs(s.speed),gripAngle=Math.atan(JEEP.maxLateralAcceleration*JEEP.wheelbase/Math.max(1,speed*speed));
- const steeringLimit=Math.min(JEEP.maxSteeringAngle/(1+(speed/16)**2),gripAngle);
+ // Extra parking lock fades out by 10 m/s; cruise steering and grip stay unchanged.
+ const parkingLock=(JEEP.parkingSteeringAngle-JEEP.maxSteeringAngle)*(1-smooth((speed-3)/7));
+ const steeringLimit=Math.min(JEEP.maxSteeringAngle/(1+(speed/16)**2)+parkingLock,gripAngle);
  s.steeringAngle=approach(s.steeringAngle,steer*steeringLimit,steer?5.5:7,dt);
  const yaw=clamp(s.speed*Math.tan(s.steeringAngle)/JEEP.wheelbase,-JEEP.maxLateralAcceleration/Math.max(speed,1),JEEP.maxLateralAcceleration/Math.max(speed,1));
  s.yawRate=approach(s.yawRate,yaw,9,dt);

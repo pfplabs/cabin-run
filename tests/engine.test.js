@@ -17,7 +17,7 @@ test('jeep accelerates gradually, brakes, reverses and steers in both directions
  const s=running();step(s,{up:true},.5);assert.ok(s.speed>1&&s.speed<2.5);const speed=s.speed;step(s,{brake:true},.5);near(s.speed,0);assert.ok(speed>0);
  step(s,{down:true},1.5);assert.ok(s.speed<-3);const h=s.heading;step(s,{down:true,right:true},.4);assert.ok(s.heading<h);
  const forward=running();step(forward,{up:true},1);const fh=forward.heading;E.update(forward,{up:true,right:true},.02);
- assert.ok(forward.steeringAngle>0&&forward.steeringAngle<.06);assert.ok(Math.abs(forward.heading-fh)<.005);
+ assert.ok(forward.steeringAngle>0&&forward.steeringAngle<.09);assert.ok(Math.abs(forward.heading-fh)<.005);
  step(forward,{up:true,right:true},.3);assert.ok(forward.heading>fh);
 });
 test('jeep cabin, shoreline and outer boundaries stop without bouncing and permit reverse',()=>{
