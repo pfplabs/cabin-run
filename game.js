@@ -13,6 +13,7 @@ import {SHORELINE_GLSL} from './shoreline.js';
 import {createWaterfallBridge} from './waterfall-bridge.js';
 import {createMinimap} from './minimap.js';
 import {applyHeroMaterials} from './hero-materials.js';
+import {applyVehicleFidelity} from './vehicle-fidelity.js';
 import {createRoadSigns} from './road-signs.js';
 import {createForest} from './foliage.js';
 import {landscapeHeight,createLandscapeGeometry,createLandscapeTiles,createAsphaltMaps,createLakeDetails,createSandbar,createMountainTunnel,createParkingLot} from './environment.js';
@@ -105,6 +106,7 @@ new GLTFLoader().load('./assets/northbound.glb',gltf=>{
  scene.add(gltf.scene);gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];for(let i=0;i<mats.length;i++){let m=mats[i];if(/cedar|deck|timber/i.test(m.name)){Object.assign(m,woodMaps);m.color.set(/deck/i.test(m.name)?0x968575:0xd1b395);m.bumpScale=.045;m.roughness=.82;m.needsUpdate=true;}if(/glazing/i.test(m.name)){const glass=new THREE.MeshPhysicalMaterial({name:m.name,color:0xb3c4c3,roughness:.095,metalness:0,transmission:.30,thickness:.12,ior:1.5,transparent:true,opacity:.88,envMapIntensity:1.35,side:THREE.DoubleSide});mats[i]=glass;}if(/Granite/i.test(m.name)){const stone=createRockMaterial();stone.name=m.name;mats[i]=stone;}if(/jeep paint|Floatplane yellow/i.test(m.name)){const paint=new THREE.MeshPhysicalMaterial();THREE.MeshStandardMaterial.prototype.copy.call(paint,m);paint.clearcoat=.55;paint.clearcoatRoughness=.22;paint.roughness=.35;mats[i]=paint;}if(/Aluminium/i.test(m.name)){m.metalness=.92;m.roughness=.29;}}o.material=Array.isArray(o.material)?mats:mats[0];if(/Meadow terrain|Gravel track/.test(o.name)||/Meadow|Interior shadow|Pine needles|Sunlit needles|Pine bark/.test(mats[0]?.name)||/Gravel road/.test(mats[0]?.name))o.visible=false;}
  });
  applyHeroMaterials(gltf.scene);
+ applyVehicleFidelity(gltf.scene);
  jeep=gltf.scene.getObjectByName('JeepRoot');plane=gltf.scene.getObjectByName('PlaneRoot');propeller=gltf.scene.getObjectByName('Propeller');wheels=['LeftFront','LeftRear','RightFront','RightRear'].map(n=>gltf.scene.getObjectByName('JeepWheel'+n)).filter(Boolean);
  if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
  plane.position.set(E.DOCK.x,E.FLIGHT.waterHeight,E.DOCK.z);plane.rotation.set(0,Math.PI,0);
