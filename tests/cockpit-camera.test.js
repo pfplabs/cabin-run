@@ -27,3 +27,10 @@ test('authored nested anchors take precedence and glass is isolated and restored
  cockpit.apply(camera,{phase:'plane'},false);assert.equal(mesh.material.opacity,.88);assert.equal(mesh.material.transmission,.3);assert.equal(mesh.material.transparent,false);assert.equal(mesh.material.depthWrite,true);
  assert.equal(cockpit.apply(camera,{phase:'missing'}),false);
 });
+
+test('rebuilt pickup window panes receive reversible cockpit transparency',()=>{
+ const root=new Object3D(),original=new MeshPhysicalMaterial({name:'Jeep clear window panes',transparent:true,opacity:.43});
+ const mesh=new Mesh(new BoxGeometry(),original);root.add(mesh);const cockpit=new CockpitCamera({jeep:root});
+ cockpit.setActive('jeep');assert.equal(mesh.material.opacity,.06);assert.equal(original.opacity,.43);
+ cockpit.setActive(null);assert.equal(mesh.material.opacity,.43);
+});

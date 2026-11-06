@@ -227,6 +227,7 @@ export function applyJeepBody(root){
   for(let i=0;i<positions.count;i++){const z=positions.getZ(i),stretch=z<-.5?1.12:z<=.65?1.20:z<=.8?3.2:1.20;positions.setZ(i,pickupZ(z));n.fromBufferAttribute(normals,i);n.z/=stretch;n.normalize();normals.setXYZ(i,n.x,n.y,n.z);}const o=new THREE.Mesh(g,palette[kind]);o.name='Rebuilt Jeep '+kind;o.castShadow=kind!=='glass';o.receiveShadow=kind!=='glass';jeep.add(o);
   stats.triangles+=g.attributes.position.count/3;stats.draws++;for(const a of clean)a.dispose();for(const a of items)a.dispose();
  }
+ const cockpitAnchor=new THREE.Object3D();cockpitAnchor.name='JeepCockpitCamera';cockpitAnchor.position.set(-.46,1.94,.38);jeep.add(cockpitAnchor);
  stats.wheels=applyPickupWheels(jeep);
  jeep.userData.bodyRebuild=stats;return stats;
 }

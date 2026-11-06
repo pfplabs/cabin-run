@@ -17,7 +17,7 @@ export class CockpitCamera {
    root.traverse(object=>{
     if(!object.isMesh)return;
     const materials=(Array.isArray(object.material)?object.material:[object.material]).map(material=>{
-     if(!/glazing|glass/i.test(material.name))return material;
+     if(!/glazing|glass|window panes/i.test(material.name))return material;
      const copy=material.clone();this.glass.push({phase,material:copy,opacity:copy.opacity,transmission:copy.transmission,transparent:copy.transparent,depthWrite:copy.depthWrite});return copy;
     });
     object.material=Array.isArray(object.material)?materials:materials[0];

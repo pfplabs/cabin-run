@@ -20,3 +20,26 @@ Chrome on Mac: both parked cockpit views visually inspected, clear forward view,
 Automated tests cover full pitch/yaw/roll and parent transforms, authored nested-anchor precedence, glass isolation/restoration, cockpit near-plane restoration, bypassing exterior collision, clearing active drag capture, pause/resume, and existing touch/orbit/zoom behavior.
 
 Limitations: current models have simple interior geometry (no new instrument panel or working gauges). Fixed forward cockpit view; no cockpit head-look. Future replacement vehicle geometry should supply tuned anchors and be visually rechecked. Live airborne/mobile-device QA and combined-build performance profiling remain for the integrator; no claim of a measured FPS gain.
+
+## Combined model integration
+
+Integrated into the current pickup/tire/seaplane/flight build after c5cea86.
+The pickup now supplies JeepCockpitCamera at (-0.46, 1.94, 0.38), behind its
+stretched windshield; the older fallback was in front of this replacement pane.
+Cockpit glass recognition includes the pickup's `Jeep clear window panes`.
+The renderer-quality registry runs after cockpit glass cloning, retaining
+reversible surface toggles on the actual scene materials. Module URLs refresh
+these changed dependencies in existing localhost tabs.
+
+153 combined tests pass, including pose transforms, glass restoration, near-plane
+restoration, orbit/touch event handling and pickup-pane regression. Chrome checked
+both seats, full camera cycle, and vehicle switching. The truck windshield now
+frames the seated view, with no eye intersection observed. Simple dashboard and
+interior geometry remain; no working cockpit instruments or head-look added.
+Physical mobile-device testing and manual cockpit landing remain outstanding.
+
+Live combined-world QA also completed engine startup, takeoff and a banked turn
+from the plane cockpit. At the saved frame: airborne y=16.12 m, roll=-0.511 rad,
+heading=0.164 rad, cameraMode=cockpit, no events or console errors. The local
+fixture applies normal flight inputs; it is not a manual landing certification.
+Screenshots: task-3/evidence/cockpit-{pickup,plane,flight}-integrated.jpg.
