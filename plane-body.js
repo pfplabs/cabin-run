@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {applyPlaneAirframe} from './plane-airframe.js';
 import {mergeGeometries} from './vendor/utils/BufferGeometryUtils.js';
 
 const V=p=>new THREE.Vector3(...p);
@@ -90,5 +91,5 @@ export function applyPlaneBody(root){
  }
  for(const x of [-.38,-.16,.06,.28]){add(alloy,new THREE.TorusGeometry(.065,.008,6,16).translate(x,1.93,-1.308));add(dark,new THREE.CircleGeometry(.058,16).translate(x,1.93,-1.305));}
  for(const [m,parts] of batches){const prepared=parts.map(g=>{const p=g.index?g.toNonIndexed():g.clone();p.deleteAttribute('uv');return p;});const geometry=mergeGeometries(prepared);const mesh=new THREE.Mesh(geometry,m);mesh.name='Aircraft rebuilt '+m.name;mesh.castShadow=m!==glass;mesh.receiveShadow=m!==glass;plane.add(mesh);stats.addedBatches++;stats.addedTriangles+=geometry.attributes.position.count/3;parts.forEach(g=>g.dispose());prepared.forEach(g=>g.dispose());}
- plane.userData.bodyFidelity=stats;return stats;
+ plane.userData.bodyFidelity=stats;applyPlaneAirframe(plane);return stats;
 }
