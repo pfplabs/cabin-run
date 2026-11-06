@@ -94,3 +94,34 @@ Run `python3 -m http.server 4173`, then open `http://localhost:4173/?qa=1`:
 ## Known scope boundaries
 
 This is a compact, forgiving exploration game, not a full vehicle/flight simulator. The V key is a scene selector. Cockpit views are deferred until after visual work. Current artwork remains an iteration toward the reference, not a claim of photographic equivalence. The final trailer and retrospective article have not been produced or published.
+
+## Isolated river/cascade pass — 2026-11-06
+
+Base: `38a7856`, branch `feat/river-cascade-realism`. Integrate by cherry-picking
+this commit into the cabin feature checkout. Changes are restricted to the bridge
+water factory, new `river-water.js`, and regression tests. No lake material,
+terrain carving, gameplay or renderer-quality files changed.
+
+The river uses a lit standard material, variable width within the existing gorge,
+exact stations at the cascade bed breaks, distance-based longitudinal UVs,
+localized impact foam, accelerated falling flow, and 64 instanced droplets.
+Bank boulders sit closer to the channel. Lake-mouth alpha fades over 12 metres.
+Animation updates one shared time uniform; no CPU vertex/instance uploads,
+texture loads, render targets or extra reflection passes.
+
+Validation: all 129 tests pass, including road/bridge clearance, bed continuity,
+width bounds and stable geometry/instance arrays across 600 updates. Entire
+bridge/water group is five mesh draws and 13,124 triangles before shadow passes
+or lake reflection. This is a geometry budget, not a measured frame-time result.
+`git diff --check` passes. An isolated 1200×800 headless Chrome preview rendered
+the shader and spray with synthetic gorge terrain; `../evidence/river-shader-preview.png`
+records the initial shader version before the final reduction in waterfall contrast.
+The final frame-timing capture did not return usable measurements and was stopped.
+No FPS improvement is claimed. Final in-game daylight, lake-mouth blend, animated
+visual inspection, and full-frame GPU/cadence measurements remain integration QA.
+The existing interactive cabin browser tabs were not changed.
+
+Reproducible isolated preview: serve this checkout and open
+`artifacts/river-preview.html` (included in this commit). It stops after 240 frames
+and displays cadence statistics after 220; its synthetic terrain is for shader
+inspection, not a replacement for testing the full cabin scene.

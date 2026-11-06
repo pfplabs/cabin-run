@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createRiverWater} from './river-water.js';
 import {BRIDGE,roadPoint} from './engine.js';
 import {createRockMaterial,createGraniteGeometry} from './landscape-materials.js';
 
@@ -34,14 +35,6 @@ export function createBridgeDeckGeometry(segments=64){
  for(let i=0;i<indices.length;i+=3)[indices[i+1],indices[i+2]]=[indices[i+2],indices[i+1]];
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();return g;
 }
-function waterGeometry(){
- const p=[],uv=[],indices=[],rows=180,cols=16;
- for(let j=0;j<=rows;j++){
-  const z=WATERCOURSE.mouthZ+(WATERCOURSE.headZ-WATERCOURSE.mouthZ)*j/rows,fall=smooth((z-960)/25),width=7-fall*2.1;
-  for(let i=0;i<=cols;i++){const u=i/cols,edge=Math.abs(u*2-1),x=streamCenter(z)+(u*2-1)*width;p.push(x,streamHeight(z)+.10+.14*Math.sin(z*.8+x*1.7)*(1-edge),z);uv.push(u,(z-698)/9);if(j<rows&&i<cols){const n=j*(cols+1)+i;indices.push(n,n+cols+1,n+1,n+1,n+cols+1,n+cols+2);}}
- }
- const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();return g;
-}
 export function createWaterfallBridge(){
  const group=new THREE.Group();group.name='South shore granite bridge and waterfall';
  const slab=new THREE.Mesh(createBridgeDeckGeometry(),new THREE.MeshStandardMaterial({color:0x8b8980,roughness:.94}));slab.name='Curved bridge deck below asphalt';slab.castShadow=slab.receiveShadow=true;group.add(slab);
@@ -62,31 +55,10 @@ export function createWaterfallBridge(){
  const structure=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x787567,roughness:.95}),boxes.length);structure.name='Bridge rails and bank piers';boxes.forEach((m,i)=>structure.setMatrixAt(i,m));structure.castShadow=structure.receiveShadow=true;group.add(structure);
  const rocks=new THREE.InstancedMesh(createGraniteGeometry({detail:1}),createRockMaterial({relief:.5}),44);rocks.name='Waterfall bedrock and river boulders';
  for(let i=0;i<44;i++){
-  const z=i<16?977+(i%8)*6:710+(i-16)*9,side=i%2?1:-1,x=streamCenter(z)+side*(i<16?9:10+2*Math.sin(i*7)),size=i<16?6:1.2+1.2*(.5+.5*Math.sin(i*13));
+  const z=i<16?977+(i%8)*6:710+(i-16)*9,side=i%2?1:-1,x=streamCenter(z)+side*(i<16?7.8:6.5+1.3*Math.sin(i*7)),size=i<16?6:1.2+1.2*(.5+.5*Math.sin(i*13));
   matrix.position.set(x,streamHeight(z)-size*.35,z);matrix.rotation.set(.15*Math.sin(i),i*2.4,.15*Math.cos(i));matrix.scale.set(size*.8,size*(i<16?1.25:.6),size*1.3);matrix.updateMatrix();rocks.setMatrixAt(i,matrix.matrix);
  }
  rocks.castShadow=rocks.receiveShadow=true;group.add(rocks);
- const time={value:0};
- const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time},vertexShader:`varying vec2 vUv;varying vec3 vWorld;void main(){vUv=uv;vWorld=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`
- uniform float time;varying vec2 vUv;varying vec3 vWorld;
- float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
- float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
- void main(){
- float flow=vUv.y+time*1.8;
- float turbulence=noise(vec2(vUv.x*21.,flow*5.));
- float strands=noise(vec2(vUv.x*37.,flow*1.8));
- float falling=smoothstep(962.,984.,vWorld.z)*(1.-smoothstep(1000.,1014.,vWorld.z));
- float plume=exp(-pow((vWorld.z-975.)/9.,2.));
- float edges=smoothstep(0.,.10,vUv.x)*(1.-smoothstep(.90,1.,vUv.x));
- float foam=smoothstep(.50,.78,turbulence+falling*.30+plume*.27)*(.35+.65*strands);
- vec3 river=mix(vec3(.10,.25,.24),vec3(.33,.48,.43),turbulence);
- vec3 color=mix(river,vec3(.86,.91,.86),clamp(foam+falling*(.44+.20*strands),0.,1.));
- float breakup=mix(1.,smoothstep(.16,.42,strands),falling*.5);
- gl_FragColor=vec4(color,edges*(.86+falling*.12)*breakup);
- #include <tonemapping_fragment>
- #include <colorspace_fragment>
- }`});
- const water=new THREE.Mesh(waterGeometry(),material);water.name='Animated broken cascade and lake tributary';water.renderOrder=2;group.add(water);
- group.update=elapsedSeconds=>{if(Number.isFinite(elapsedSeconds))time.value=elapsedSeconds;};
- group.userData.time=time;return group;
+ const river=createRiverWater({...WATERCOURSE,center:streamCenter,height:streamHeight});group.add(river);
+ group.update=river.update;group.userData.time=river.userData.time;return group;
 }
