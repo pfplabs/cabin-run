@@ -20,3 +20,9 @@ Run `python3 -m http.server 4173` and visit `http://localhost:4173/?qa=1` in a W
 8. Capture genuine gameplay only after these pass. Record one jeep shoreline approach and one floatplane lake-to-cabin approach. Keep Blender renders labeled separately.
 
 Optional setup helpers in QA mode: `cabinQA.start()`, `cabinQA.switchVehicle()`, `cabinQA.setMode('cabin')`. `cabinQA.state` can arrange a shot; record actual frame-by-frame simulation after setup and disclose staged starts where relevant. Do not use synthetic renders as gameplay.
+
+## Material pass checks
+- Photographed HDR decoded successfully as 1024 × 512 RGBE.
+- HDR, Water and foliage module imports pass without a GPU.
+- Syntax, physical-material defaults and all 10 simulation tests remain passing.
+- New ground/stone shaders, HDR orientation, exposure, timber UV scale, glass transmission, needle-card performance and mobile graphics still require live WebGL testing.

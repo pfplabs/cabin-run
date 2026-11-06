@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {HDRLoader} from 'three/addons/loaders/HDRLoader.js';
 import {Water} from './vendor/Water.js';
 import * as E from './engine.js';
 import {createForest} from './foliage.js';
@@ -12,15 +13,15 @@ try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'hig
 catch(err){$('#fatal').classList.remove('hidden');$('#fatal').textContent='This scene needs WebGL 2. Please enable hardware acceleration or open it in a current Chrome, Safari, Firefox or Edge browser.';throw err;}
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.88;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x9fbac5,.0021);
 const camera=new THREE.PerspectiveCamera(49,innerWidth/innerHeight,.2,1500);
 camera.position.set(-49,24,55);camera.lookAt(0,4,-7);
 const controls=new OrbitControls(camera,canvas);controls.target.set(0,4,-7);controls.enableDamping=true;controls.dampingFactor=.07;controls.maxPolarAngle=Math.PI*.47;controls.minDistance=6;controls.maxDistance=190;controls.enablePan=false;controls.enabled=false;
-scene.add(new THREE.HemisphereLight(0xd6eaff,0x435534,2.0));
+const ambient=new THREE.HemisphereLight(0xd6e4ec,0x44433b,.65);scene.add(ambient);
 const sunDirection=new THREE.Vector3(-.6,.48,.55).normalize();
-const sun=new THREE.DirectionalLight(0xffdeb0,3.8);sun.position.copy(sunDirection).multiplyScalar(110);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-100;sun.shadow.camera.right=100;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;sun.shadow.camera.near=1;sun.shadow.camera.far=300;sun.shadow.bias=-.00025;sun.shadow.normalBias=.035;scene.add(sun,sun.target);
+const sun=new THREE.DirectionalLight(0xffe2bd,2.6);sun.position.copy(sunDirection).multiplyScalar(110);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-100;sun.shadow.camera.right=100;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;sun.shadow.camera.near=1;sun.shadow.camera.far=300;sun.shadow.bias=-.00025;sun.shadow.normalBias=.035;scene.add(sun,sun.target);
 
 // Atmospheric sky: a high horizon, warm western glow and fine, layered clouds.
 const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:{sun:{value:sunDirection}},vertexShader:`varying vec3 vDir;void main(){vDir=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`
@@ -28,21 +29,49 @@ varying vec3 vDir;uniform vec3 sun;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
 void main(){vec3 d=normalize(vDir);float h=max(d.y,0.);vec3 c=mix(vec3(.73,.79,.77),vec3(.15,.37,.61),pow(h,.42));float sd=max(dot(d,sun),0.);c+=vec3(.7,.28,.08)*pow(sd,12.)+vec3(3.,2.4,1.5)*pow(sd,1400.);vec2 uv=d.xz/max(.12,d.y)*1.9;float n=noise(uv)+.5*noise(uv*2.3)+.2*noise(uv*5.);float cloud=smoothstep(.94,1.25,n)*smoothstep(.03,.25,h);c=mix(c,vec3(.96,.88,.74),cloud*.65);gl_FragColor=vec4(c,1.);}`});
-scene.add(new THREE.Mesh(new THREE.SphereGeometry(900,32,16),skyMat));
+const sky=new THREE.Mesh(new THREE.SphereGeometry(900,32,16),skyMat);scene.add(sky);
+// HDR provides real sky luminance to glass, paint, metal and diffuse surfaces.
+// The atmospheric shader remains available if the optional HDR cannot load.
+new HDRLoader().load('./assets/pbr/blouberg_sunrise_2_1k.hdr',hdr=>{
+ hdr.mapping=THREE.EquirectangularReflectionMapping;
+ scene.environment=hdr;scene.environmentIntensity=.65;
+ scene.background=hdr;scene.backgroundIntensity=.85;scene.backgroundBlurriness=.035;
+ scene.environmentRotation.y=scene.backgroundRotation.y=.65;
+ sky.visible=false;ambient.intensity=.18;
+},undefined,()=>console.warn('HDR unavailable; atmospheric fallback remains active.'));
+const textureLoader=new THREE.TextureLoader();
+function surfaceMap(file,{color=false,repeat=[1,1],flipY=true}={}){
+ const t=textureLoader.load('./assets/pbr/'+file);t.wrapS=t.wrapT=THREE.RepeatWrapping;
+ t.repeat.set(...repeat);t.flipY=flipY;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+ if(color)t.colorSpace=THREE.SRGBColorSpace;return t;
+}
 
 // Live planar reflections and wave normals. No painted-background illusion.
-const nc=document.createElement('canvas');nc.width=nc.height=256;const nctx=nc.getContext('2d'),ni=nctx.createImageData(256,256);
-for(let y=0;y<256;y++)for(let x=0;x<256;x++){const i=(y*256+x)*4;ni.data[i]=128+36*Math.sin(x*.27+y*.14)+19*Math.sin(y*.61);ni.data[i+1]=128+32*Math.cos(y*.23+x*.18);ni.data[i+2]=235;ni.data[i+3]=255;}nctx.putImageData(ni,0,0);
-const normals=new THREE.CanvasTexture(nc);normals.wrapS=normals.wrapT=THREE.RepeatWrapping;
-const water=new Water(new THREE.PlaneGeometry(1400,1400),{textureWidth:innerWidth<700?512:1024,textureHeight:innerWidth<700?512:1024,waterNormals:normals,sunDirection,sunColor:0xffd3a0,waterColor:0x124d58,distortionScale:2.1,fog:true});water.rotation.x=-Math.PI/2;water.position.y=0;scene.add(water);
+const normals=surfaceMap('waternormals.jpg');
+const water=new Water(new THREE.PlaneGeometry(1400,1400),{textureWidth:innerWidth<700?512:1024,textureHeight:innerWidth<700?512:1024,waterNormals:normals,sunDirection,sunColor:0xffd3a0,waterColor:0x203b3e,distortionScale:1.25,fog:true});water.rotation.x=-Math.PI/2;water.position.y=0;scene.add(water);
 
 // Lake terrain, paved scenic road and distant mountain basin are generated meshes.
 function landHeight(x,z){const r=E.lakeRadius(x,z);if(r<1)return -2;const rr=E.roadRadius(x,z);if(rr<1.17)return E.terrainHeight(x,z);const rise=Math.max(0,rr-1.17);return 1+rise*28+Math.pow(rise,1.4)*18+Math.sin(x*.047)*Math.cos(z*.041)*Math.min(14,rise*16);}
-function groundTexture(){const c=document.createElement('canvas');c.width=c.height=512;const ctx=c.getContext('2d'),d=ctx.createImageData(512,512);let seed=108;const rand=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);for(let i=0;i<d.data.length;i+=4){const n=rand()*30;d.data[i]=95+n;d.data[i+1]=109+n;d.data[i+2]=58+n*.6;d.data[i+3]=255;}ctx.putImageData(d,0,0);for(let i=0;i<4500;i++){const x=rand()*512,y=rand()*512;ctx.strokeStyle=rand()>.5?'#85954f':'#3a512c';ctx.lineWidth=.6;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+(rand()-.5)*4,y-2-rand()*5);ctx.stroke();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(65,65);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;}
+const grass=surfaceMap('grasslight-big.jpg',{color:true,repeat:[90,90]});
 const groundGeo=new THREE.PlaneGeometry(650,650,190,190);groundGeo.rotateX(-Math.PI/2);groundGeo.translate(0,0,62);const gp=groundGeo.attributes.position;const colors=[];const col=new THREE.Color();
 for(let i=0;i<gp.count;i++){const x=gp.getX(i),z=gp.getZ(i),y=landHeight(x,z);gp.setY(i,y);const r=E.lakeRadius(x,z);col.set(r<1.05?0xc5bb8e:y>52?0xb2b8b2:y>20?0x8d9689:0xffffff);colors.push(col.r,col.g,col.b);}
 groundGeo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));groundGeo.computeVertexNormals();
-const ground=new THREE.Mesh(groundGeo,new THREE.MeshStandardMaterial({map:groundTexture(),vertexColors:true,roughness:1,metalness:0}));ground.receiveShadow=true;scene.add(ground);
+const terrainMaterial=new THREE.MeshStandardMaterial({map:grass,vertexColors:true,roughness:1,metalness:0,color:0xa5a895});
+// World-space macro variation breaks repeating grass; steep slopes expose stone.
+terrainMaterial.onBeforeCompile=shader=>{
+ shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vTerrain; varying vec3 vTerrainNormal;').replace('#include <begin_vertex>','#include <begin_vertex>\nvTerrain=position;vTerrainNormal=normal;');
+ shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vTerrain; varying vec3 vTerrainNormal;');
+ shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+ float macro=sin(vTerrain.x*.037+sin(vTerrain.z*.041)*2.)*sin(vTerrain.z*.026);
+ diffuseColor.rgb*=.88+macro*.12;
+ float slope=1.-abs(normalize(vTerrainNormal).y);
+ float rock=smoothstep(.2,.55,slope)*smoothstep(12.,38.,vTerrain.y);
+ float grain=.5+.5*sin(vTerrain.x*1.7+sin(vTerrain.z*2.1))*sin(vTerrain.y*2.8);
+ vec3 stone=mix(vec3(.16,.17,.16),vec3(.28,.29,.27),grain);
+ diffuseColor.rgb=mix(diffuseColor.rgb,stone,rock);
+ `);
+};
+const ground=new THREE.Mesh(groundGeo,terrainMaterial);ground.receiveShadow=true;scene.add(ground);
 function ribbon(points,width,color,y=.025){const positions=[],uv=[],indices=[];for(let i=0;i<points.length;i++){const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next.x-prev.x,dz=next.z-prev.z,len=Math.hypot(dx,dz)||1;for(const side of [-1,1]){const x=p.x-dz/len*width/2*side,z=p.z+dx/len*width/2*side;positions.push(x,E.terrainHeight(x,z)+y,z);uv.push(side===-1?0:1,i/points.length*20);}if(i<points.length-1){const a=i*2;indices.push(a,a+2,a+1,a+1,a+2,a+3);}}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();const o=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color,roughness:.95,side:THREE.DoubleSide}));o.receiveShadow=true;scene.add(o);return o;}
 const roadPts=Array.from({length:193},(_,i)=>({x:94*Math.sin(i/192*Math.PI*2),z:62-94*Math.cos(i/192*Math.PI*2)}));ribbon(roadPts,7,0x363c3b,.065);ribbon([{x:-22,z:-29},{x:-23,z:-19},{x:-17,z:-9},{x:-18,z:3}],4.5,0x777762,.10);
 for(let i=0;i<192;i+=3){const p=roadPts[i],n=roadPts[i+1];ribbon([p,n],.11,0xc9c3a1,.078);}
@@ -55,10 +84,22 @@ let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
 
 let jeep,plane,propeller,ready=false,visual=0,mode='chase',orbitOffset=0,orbitLift=0,sound=false,audioCtx,osc,gain;
 const keys=new Set(),held=new Map();let last=0,toastLife=0,updateClock=0;
-function woodTexture(){const c=document.createElement('canvas');c.width=512;c.height=128;const x=c.getContext('2d');x.fillStyle='#bca98d';x.fillRect(0,0,512,128);for(let i=0;i<700;i++){const y=random()*128;x.strokeStyle=`rgba(65,38,15,${random()*.18})`;x.lineWidth=random()*1.4;x.beginPath();x.moveTo(0,y);x.bezierCurveTo(160,y+random()*8-4,320,y+random()*8-4,512,y);x.stroke();}const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=4;return t;}
-const wood=woodTexture();
+const woodMaps={map:surfaceMap('hardwood2_diffuse.jpg',{color:true,flipY:false}),bumpMap:surfaceMap('hardwood2_bump.jpg',{flipY:false}),roughnessMap:surfaceMap('hardwood2_roughness.jpg',{flipY:false})};
+// Small world-space mineral variation adds scale to the existing granite shapes.
+function graniteMaterial(m){
+ m.roughness=.92;
+ m.onBeforeCompile=shader=>{
+  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vStone;').replace('#include <begin_vertex>','#include <begin_vertex>\nvStone=(modelMatrix*vec4(position,1.)).xyz;');
+  shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vStone;');
+  shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+   float mineral=fract(sin(dot(floor(vStone*35.),vec3(12.9898,78.233,37.719)))*43758.5453);
+   float strata=sin(vStone.x*3.+vStone.y*5.+sin(vStone.z*4.));
+   diffuseColor.rgb*=.72+.30*mineral+.10*strata;
+  `);
+ };
+}
 new GLTFLoader().load('./assets/northbound.glb',gltf=>{
- scene.add(gltf.scene);gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];for(const m of mats){if(/cedar|deck|timber/i.test(m.name)){m.map=wood;m.bumpMap=wood;m.bumpScale=.025;m.roughness=.7;m.needsUpdate=true;}if(/glazing/i.test(m.name)){m.roughness=.1;m.metalness=.35;}}if(/Meadow terrain|Gravel track/.test(o.name)||/Meadow|Interior shadow|Pine needles|Sunlit needles|Pine bark/.test(mats[0]?.name)||/Gravel road/.test(mats[0]?.name))o.visible=false;}
+ scene.add(gltf.scene);gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];for(let i=0;i<mats.length;i++){let m=mats[i];if(/cedar|deck|timber/i.test(m.name)){Object.assign(m,woodMaps);m.color.set(/deck/i.test(m.name)?0x968575:0xd1b395);m.bumpScale=.045;m.roughness=.82;m.needsUpdate=true;}if(/glazing/i.test(m.name)){const glass=new THREE.MeshPhysicalMaterial({name:m.name,color:0xb3c4c3,roughness:.095,metalness:0,transmission:.30,thickness:.12,ior:1.5,transparent:true,opacity:.88,envMapIntensity:1.35,side:THREE.DoubleSide});mats[i]=glass;}if(/Granite/i.test(m.name))graniteMaterial(m);if(/jeep paint|Floatplane yellow/i.test(m.name)){const paint=new THREE.MeshPhysicalMaterial();THREE.MeshStandardMaterial.prototype.copy.call(paint,m);paint.clearcoat=.55;paint.clearcoatRoughness=.22;paint.roughness=.35;mats[i]=paint;}if(/Aluminium/i.test(m.name)){m.metalness=.92;m.roughness=.29;}}o.material=Array.isArray(o.material)?mats:mats[0];if(/Meadow terrain|Gravel track/.test(o.name)||/Meadow|Interior shadow|Pine needles|Sunlit needles|Pine bark/.test(mats[0]?.name)||/Gravel road/.test(mats[0]?.name))o.visible=false;}
  });
  jeep=gltf.scene.getObjectByName('JeepRoot');plane=gltf.scene.getObjectByName('PlaneRoot');propeller=gltf.scene.getObjectByName('Propeller');
  if(!jeep||!plane)throw new Error('Scene is missing vehicle nodes.');
