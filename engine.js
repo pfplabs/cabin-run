@@ -42,6 +42,19 @@ export function terrainHeight(x,z){
  const foundationDistance=Math.hypot(Math.max(-2.8-x,0,x-23.8),Math.max(-26.4-z,0,z+6.5));
  return height+(1.1-height)*(1-smooth(foundationDistance/2.2));
 }
+/** One continuous massif grows directly from the uphill road shoulder.
+ * Shared by rendering and flight clearance; the paved corridor is unchanged. */
+export function mountainHeight(x,z){
+ const a=Math.atan2(x,WORLD.centerZ-z),d=roadOffset(x,z)-6;
+ if(d<=0)return -Infinity;
+ const angle=wrap(a-.2),edge=1-smooth((Math.abs(angle)-.72)/.5);
+ if(edge===0)return -Infinity;
+ // Broad left shoulder fills the old trough; angular ribs never cut a radial valley.
+ const flank=Math.exp(-Math.pow(angle/.68,2))*(.96+.04*Math.cos(angle*18));
+ const ascent=Math.pow(Math.sin(Math.min(d/700,1)*Math.PI/2),1.12);
+ const back=1-smooth((d-700)/900);
+ return (routeHeight(a)+820*ascent*flank)*edge*back;
+}
 export function fresh(){return {status:'ready',phase:'jeep',x:-16,y:terrainHeight(-16,-9),z:-9,heading:-.45,speed:0,pitch:0,roll:0,elapsed:0,cooldown:0,events:[],actionReady:false,takeoff:0,parked:false,arrived:false,...flightState(),...jeepState()}}
 export function begin(s,vehicle='jeep'){Object.assign(s,fresh(),{status:'running'});switchVehicle(s,vehicle);}
 export function togglePause(s){if(s.status==='running')s.status='paused';else if(s.status==='paused')s.status='running';}
@@ -132,7 +145,7 @@ function updateJeep(s,input,steer,dt){
 }
 function flightGroundHeight(x,z){
  const outer=roadRadius(x,z),rise=Math.max(0,outer-1.17);
- return Math.max(terrainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
+ return Math.max(terrainHeight(x,z),mountainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
 }
 function flightClearance(x,z){
  const angle=Math.atan2(x,WORLD.centerZ-z),offset=Math.abs(roadOffset(x,z));
@@ -227,3 +240,4 @@ function updatePlane(s,input,steer,dt){
  }
  s.actionReady=s.enginePhase==='running'&&s.onWater&&Math.hypot(s.x-DOCK.x,s.z-DOCK.z)<10&&s.speed<3;
 }
+

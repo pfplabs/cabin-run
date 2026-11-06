@@ -68,7 +68,7 @@ const fields=`
  float lmRough=clamp(.85+(lmLarge.a-.5)*.14+(lmFine.a-.5)*.08*lmDetail,.72,.97);
 `;
 function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:114},relief=1}={}){
- material.customProgramCacheKey=()=>`northbound-landscape-v1-${terrain?'terrain':'rock'}`;
+ material.customProgramCacheKey=()=>`northbound-landscape-v2-${terrain?'terrain':'rock'}`;
  material.userData.landscapeSurface={kind:terrain?'terrain':'rock',worldUnits:'metres',externalTextures:grassMap?1:0};
  material.onBeforeCompile=shader=>{
   shader.uniforms.lmSurface={value:shared()};shader.uniforms.lmRelief={value:relief};
@@ -103,11 +103,18 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
     vec3 lmSandColour=mix(vec3(.22,.215,.18),vec3(.43,.405,.32),smoothstep(-.05,.85,vLMWorld.y));
     vec3 lmGround=mix(lmGrassColour,lmSoilColour,lmSoil);
     lmGround=mix(lmGround,lmSandColour,lmShore);
-    lmGround=mix(lmGround,lmRock,lmRockMask);
+    lmGround=mix(lmGround,lmRock,max(lmRockMask,smoothstep(260.,450.,vLMWorld.y)));
+    // Snow gathers above the high snowline, with broken edges and exposed steep rock.
+    float lmSnow=smoothstep(530.,650.,vLMWorld.y+(lmLarge.r-.5)*65.)*
+      (1.-smoothstep(.45,.8,lmSlope));
+    vec3 lmSnowColour=mix(vec3(.68,.75,.79),vec3(.91,.94,.95),lmLarge.r);
+    lmGround=mix(lmGround,lmSnowColour,lmSnow);
     diffuseColor.rgb*=lmGround;
     lmHeight=mix((lmLarge.b-.5)*.012+(lmFine.b-.5)*.003*lmDetail,lmHeight,lmRockMask);
     lmRough=mix(.96,lmRough,lmRockMask);
     lmRough=mix(lmRough,.72,lmShore*(1.-smoothstep(-.1,.45,vLMWorld.y)));
+    lmRough=mix(lmRough,.92,lmSnow);
+    lmHeight*=1.-lmSnow*.75;
    `;
   }
   shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',colour);
@@ -146,3 +153,4 @@ export function createGraniteGeometry({radius=1,detail=5}={}){
  }
  source.dispose();const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals();g.computeBoundingSphere();return g;
 }
+

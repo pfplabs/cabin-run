@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {createRockMaterial,createGraniteGeometry} from './landscape-materials.js';
 import {clipRibbonOutsideRoad,createGravelMaterial} from './road-surfaces.js';
-import {LAKE,WORLD,terrainHeight,roadPoint,TUNNEL,PARKING,DRIVEWAY} from './engine.js';
+import {LAKE,WORLD,terrainHeight,mountainHeight,roadPoint,TUNNEL,PARKING,DRIVEWAY} from './engine.js';
 
 const smooth=(a,b,x)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 export function landscapeHeight(x,z){
@@ -10,9 +10,9 @@ export function landscapeHeight(x,z){
  if(lake<shoreInner)return -3;
  if(lake<shoreOuter)return THREE.MathUtils.lerp(-3,terrainHeight(x,z),smooth(shoreInner,shoreOuter,lake));
  const outer=Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius);
- if(outer<1.17)return terrainHeight(x,z);
+ if(outer<1.17)return Math.max(terrainHeight(x,z),mountainHeight(x,z));
  const rise=outer-1.17;
- return Math.max(terrainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
+ return Math.max(terrainHeight(x,z),mountainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
 }
 
 /** Shore-focused annular topology keeps the water edge smooth without a huge grid. */
@@ -25,7 +25,7 @@ export function createLandscapeGeometry(){
  // Resolve the carved driveway and parking apron rather than bridging them with long triangles.
  for(let i=1;i<=96;i++)sections.push({kind:'inland',t:i/96});
  for(const offset of [-5.2,-4.2,0,4.2,5.2,6.5])sections.push({kind:'road',offset});
- for(const r of [1.075,1.12,1.17,1.24,1.34,1.48,1.65,1.85,2.1,2.45,2.9,3.5])sections.push({kind:'outer',r});
+ for(const r of [1.025,1.075,1.12,1.17,1.24,1.34,1.48,1.65,1.85,2.1,2.25,2.45,2.9,3.5])sections.push({kind:'outer',r});
  const c=new THREE.Color();
  for(let row=0;row<sections.length;row++){
   const section=sections[row];
@@ -212,3 +212,4 @@ export function createLandscapeTiles(source){
  }
  return tiles;
 }
+
