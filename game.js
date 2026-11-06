@@ -16,6 +16,7 @@ import {applyHeroMaterials} from './hero-materials.js';
 import {applyVehicleFidelity} from './vehicle-fidelity.js';
 import {createRoadSigns} from './road-signs.js';
 import {createForest} from './foliage.js';
+import {createForestGrass} from './forest-grass.js';
 import {landscapeHeight,createLandscapeGeometry,createLandscapeTiles,createAsphaltMaps,createLakeDetails,createSandbar,createMountainTunnel,createParkingLot} from './environment.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -93,6 +94,7 @@ const postG=new THREE.CylinderGeometry(.065,.08,1,5),postM=new THREE.MeshStandar
 for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),q=E.roadPoint(a+.0001),length=Math.hypot(q.x-p.x,q.z-p.z),x=p.x+6.3*(q.z-p.z)/length,z=p.z-6.3*(q.x-p.x)/length;dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
 // Detailed needle cards and real trunks arranged around the mountain road.
 const forest=createForest(landHeight,E.roadRadius);scene.add(forest,createRoadSigns(landHeight));
+const forestGrass=createForestGrass(forest.getTreeLocations(),landHeight,{density:matchMedia('(pointer: coarse)').matches?.5:1});scene.add(forestGrass);
 let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
 
 const scenicBridge=createWaterfallBridge();scene.add(scenicBridge);scenicBridge.updateMatrixWorld(true);scenicBridge.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
@@ -153,8 +155,8 @@ window.addEventListener('pagehide',()=>{cameraRig.dispose();environmentTarget?.d
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));});
 
 // Public read-only diagnostics; optional QA commands exist only with ?qa=1.
-window.cabinDiagnostics=()=>({build:'large-lake-startup-landing',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
-if(new URLSearchParams(location.search).has('qa'))window.cabinQA={state,start,pause,switchVehicle,action:()=>E.action(state),setMode:m=>{mode=m;cameraRig.setMode(mode,state);},input:keys};
+window.cabinDiagnostics=()=>({build:'large-lake-startup-landing',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},grass:{...forestGrass.userData.grass},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
+if(new URLSearchParams(location.search).has('qa'))window.cabinQA={setGrassDensity:forestGrass.setDensity,setGrassWind:forestGrass.setWind,state,start,pause,switchVehicle,action:()=>E.action(state),setMode:m=>{mode=m;cameraRig.setMode(mode,state);},input:keys};
 
 function frame(t){if(last&&state.status==='running'){frameTimes.push(t-last);if(frameTimes.length>240)frameTimes.shift();}const dt=Math.min((t-last)/1000||0,.05);last=t;visual+=dt;const active=new Set([...keys,...held.values()]);const input=Object.fromEntries([...active].map(k=>[k,true]));E.update(state,input,dt);
  if(ready){
@@ -177,7 +179,7 @@ function frame(t){if(last&&state.status==='running'){frameTimes.push(t-last);if(
  const target=state.phase==='jeep'?E.HOME:E.DOCK,point=new THREE.Vector3(target.x,6,target.z).project(camera);const visible=point.z<1&&Math.abs(point.x)<.94&&Math.abs(point.y)<.92;$('#waypoint').style.opacity=visible?'1':'0';$('#waypoint').style.left=(point.x*.5+.5)*innerWidth+'px';$('#waypoint').style.top=(-point.y*.5+.5)*innerHeight+'px';$('#waypoint-label').textContent=state.phase==='jeep'?'The cabin':'Floatplane dock';$('#waypoint-distance').textContent=Math.round(Math.hypot(target.x-state.x,target.z-state.z))+' m';
  if(audioCtx){const running=sound&&state.status==='running'&&!state.parked&&(state.phase!=='plane'||state.enginePhase!=='off');gain.gain.setTargetAtTime(running?.022:0,audioCtx.currentTime,.15);osc.frequency.setTargetAtTime(state.phase==='plane'?30+(state.propRPM||0)/18:35+Math.abs(state.speed)*8,audioCtx.currentTime,.1);}
  const lightTarget=state.status==='ready'||mode==='cabin'?new THREE.Vector3(0,2,-7):new THREE.Vector3(state.x,state.y,state.z);sun.target.position.lerp(lightTarget,Math.min(1,dt*2));sun.position.copy(sun.target.position).addScaledVector(sunDirection,110);
- forest.updateLOD(camera.position,camera);
+ forest.updateLOD(camera.position,camera);forestGrass.update(visual,camera.position);
  renderer.render(scene,camera);requestAnimationFrame(frame);
 }requestAnimationFrame(frame);
 
