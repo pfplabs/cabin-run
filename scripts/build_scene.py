@@ -306,11 +306,44 @@ for x,z in [(22.4,-8.0),(12.7,-6.0)]:
 print('CABIN_ENVELOPE',{'foundation':[-2.8,23.8,-26.4,-6.5],'veranda':[-3,24,-6.5,-2.5],'ridge':11.79,'highest':13.0,'floor':1.65,'upper':4.95},flush=True)
 
 print('Cabin ready', flush=True)
-# Jetty is a real planked structure on stilts.
-for i in range(30):box('Dock plank',(-18,1.45,2+i*.48),(5.6,.16,.43),M['deck'])
-for z in [3,7,11,15]:
-    for x in [-20.9,-15.1]:beam('Dock piling',(x,-2,z),(x,2,z),.16,M['lightwood'])
-for x in [-20.6,-15.4]:box('Dock edge beam',(x,1.3,9),(.2,.35,14.5),M['cedar'])
+# Long, straight mooring jetty. Deck remains5.6m wide; no T-head obstructs
+# the northern water approach. Datum: lake water Y0, walking surface Y1.53.
+DOCK_X,DOCK_START,DOCK_END=-18,2,36
+pitch=(DOCK_END-DOCK_START)/71
+for i in range(71):
+    z=DOCK_START+(i+.5)*pitch
+    box('Dock plank',(DOCK_X,1.45,z),(5.6,.16,pitch-.025),M['deck'])
+# Five continuous stringers and regular transverse joists support human-scale boards.
+for x in [-20.6,-19.3,-18,-16.7,-15.4]:
+    box('Dock longitudinal stringer',(x,1.24,19),(.20,.30,34),M['cedar'])
+for z in [3+i*2 for i in range(17)]:
+    box('Dock transverse joist',(-18,1.08,z),(5.8,.24,.20),M['deck'])
+for z in [2.05,35.95]:box('Dock end fascia',(-18,1.37,z),(5.6,.30,.10),M['cedar'])
+for z in [3,7,11,15,19,23,27,31,35]:
+    for x in [-20.9,-15.1]:
+        beam('Dock piling',(x,-2,z),(x,2,z),.16,M['lightwood'],vertices=16)
+        beam('Dock wet timber band',(x,-.18,z),(x,.22,z),.163,M['deck'],vertices=16)
+        beam('Dock post cap',(x,1.96,z),(x,2.025,z),.17,M['black'],vertices=16)
+        # Through-bolt heads attach the beam to the piling, rather than floating rails.
+        beam('Dock beam bolt',(x-.175,1.22,z),(x+.175,1.22,z),.025,M['silver'],vertices=10)
+# Low-profile cast cleats beside the mooring section, below the aircraft wing.
+for x in [-20.50,-15.50]:
+    for z in [23,29,34.5]:
+        box('Mooring cleat foot',(x,1.56,z),(.15,.06,.34),M['silver'],.025)
+        for dz in [-.07,.07]:beam('Cleat riser',(x,1.58,z+dz),(x,1.68,z+dz),.024,M['silver'])
+        beam('Cleat horns',(x,1.69,z-.24),(x,1.69,z+.24),.035,M['silver'])
+# Slim vertical rubber fenders protect the west side without widening the approach.
+for z in [25,29,34]:
+    ellipsoid('Dock rubber fender',(-21.06,.83,z),(.14,.36,.16),M['black'])
+    beam('Fender suspension',(-20.72,1.58,z),(-21.06,1.18,z),.013,M['silver'],vertices=8)
+# Ordinary bathing/boarding ladder. It is not a six-meter gangway to the safe berth.
+for z in [32.6,33.4]:
+    beam('Dock ladder rail',(-21.15,-.40,z),(-21.15,1.80,z),.025,M['silver'])
+    beam('Dock ladder top return',(-21.15,1.80,z),(-20.65,1.80,z),.025,M['silver'])
+    beam('Dock ladder deck foot',(-20.65,1.53,z),(-20.65,1.80,z),.025,M['silver'])
+for y in [-.20,.10,.40,.70,1.00,1.30]:
+    beam('Dock ladder rung',(-21.15,y,32.6),(-21.15,y,33.4),.025,M['silver'])
+print('DOCK_ENVELOPE',{'deck_x':[-20.8,-15.2],'deck_z':[2,36],'walking_y':1.53,'pile_x':[-21.06,-14.94],'pile_z':[2.84,35.16],'pile_y':[-2,2.025],'overall_x':[-21.20,-14.925],'water_y':0},flush=True)
 # Canoe hull as a tapered open vessel.
 verts=[]
 for z in [-3,-2,-1,0,1,2,3]:
@@ -443,23 +476,82 @@ beam('Radial engine cowling',(0,1.6,-3.65),(0,1.6,-2.65),.69,M['yellow'],plane,4
 ellipsoid('Rounded cowling front',(0,1.6,-3.65),(.69,.69,.18),M['yellow'],plane)
 ring('Cowling front seam',(0,1.6,-3.69),.65,.018,M['black'],plane,axis='Z')
 ellipsoid('Cockpit glass',(0,2.04,-.6),(.68,.64,1.08),M['glass'],plane)
-# Closed airfoil profile, tapered outer wing and thin trailing edge.
-def airfoil(name,span,chord,y,z,material,parent):
-    verts=[];faces=[];N=24
-    for x,c,dy in [(-span/2,.83,.12),(-span*.42,1,.02),(0,1,0),(span*.42,1,.02),(span/2,.83,.12)]:
-        for i in range(N):
-            a=math.tau*i/N;u=(1-math.cos(a))/2
-            thickness=.12*chord*(.2969*math.sqrt(max(u,0))-.126*u-.3516*u*u+.2843*u**3-.1036*u**4)/.2
-            verts.append((x,y+dy+(.018*chord*math.sin(math.pi*u))+(1 if i<N/2 else -1)*thickness*c,z+(u-.5)*chord*c))
-    for j in range(4):
-        for i in range(N):faces.append((j*N+i,j*N+(i+1)%N,(j+1)*N+(i+1)%N,(j+1)*N+i))
-    faces.extend([tuple(reversed(range(N))),tuple(range(4*N,5*N))])
-    o=mesh(name,verts,faces,material,parent)
+# Real split control surfaces. The fixed wing has no geometry behind its
+# aileron hinge over the moving span. Coordinate helpers remain browser Y-up.
+def wing_section(x,u):
+    ax=abs(x)
+    t=max(0,min(1,(ax-5.376)/(6.4-5.376)))
+    c=1-.17*t;dy=.02*(min(ax,5.376)/5.376)+.10*t
+    thick=.12*1.95*(.2969*math.sqrt(max(u,0))-.126*u-.3516*u*u+.2843*u**3-.1036*u**4)/.2*c
+    mid=2.7+dy+.018*1.95*math.sin(math.pi*u)
+    return mid,thick,-.15+(u-.5)*1.95*c
+
+def wing_panel(name,xs,z_start,z_end,parent,pivot=(0,0,0)):
+    verts=[];faces=[];N=12
+    for x in xs:
+        t=max(0,min(1,(abs(x)-5.376)/1.024));chord=1.95*(1-.17*t)
+        ua=0 if z_start is None else max(0,min(1,(z_start+.15)/chord+.5))
+        ub=1 if z_end is None else max(0,min(1,(z_end+.15)/chord+.5))
+        for sign,us in [(1,[ua+(ub-ua)*i/N for i in range(N+1)]),(-1,[ub-(ub-ua)*i/N for i in range(N+1)])]:
+            for u in us:
+                mid,thick,z=wing_section(x,u)
+                verts.append((x-pivot[0],mid+sign*max(.004,thick)-pivot[1],z-pivot[2]))
+    ring_n=2*(N+1)
+    for j in range(len(xs)-1):
+        for i in range(ring_n):faces.append((j*ring_n+i,j*ring_n+(i+1)%ring_n,(j+1)*ring_n+(i+1)%ring_n,(j+1)*ring_n+i))
+    faces.extend([tuple(reversed(range(ring_n))),tuple(range((len(xs)-1)*ring_n,len(xs)*ring_n))])
+    o=mesh(name,verts,faces,M['yellow'],parent)
+    bm=bmesh.new();bm.from_mesh(o.data);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(o.data);bm.free()
     for f in o.data.polygons:f.use_smooth=len(f.vertices)==4
     return o
-airfoil('Cambered high wing',12.8,1.95,2.7,-.15,M['yellow'],plane)
-box('Tailplane',(0,1.9,2.8),(4.6,.14,1.2),M['yellow'],.08,plane)
-mesh('Vertical stabilizer',[(-.06,1.75,2.6),(-.06,4,3),(-.06,4,3.65),(-.06,1.75,3.7),(.06,1.75,2.6),(.06,4,3),(.06,4,3.65),(.06,1.75,3.7)],[(0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3)],M['yellow'],plane)
+
+# Five fixed segments preserve the 12.8 m span and the original cambered shape.
+wing_panel('Fixed wing center',[-2.77,0,2.77],None,None,plane)
+for sign,side in [(-1,'Left'),(1,'Right')]:
+    wing_panel('Fixed outer wing '+side,sorted([sign*2.77,sign*5.376,sign*5.83]),None,.405,plane)
+    wing_panel('Fixed wingtip '+side,sorted([sign*5.83,sign*6.4]),None,None,plane)
+    pivot=(sign*4.30,2.755,.425)
+    control=empty('PlaneAileron'+side);control.parent=plane;control.location=v(pivot)
+    wing_panel('Moving aileron '+side,sorted([sign*2.80,sign*5.376,sign*5.80]),.445,None,control,pivot)
+    # Exposed hinge barrels lie on the true rotational axis. Gaps are deliberate:
+    # 40 mm between fixed and moving skins keeps both clear at ±20 degrees.
+    for xx in [sign*3.05,sign*4.30,sign*5.55]:
+        beam('Aileron fixed hinge',(xx-.045,pivot[1],pivot[2]),(xx+.045,pivot[1],pivot[2]),.022,M['silver'],plane,12)
+        beam('Aileron hinge strap',(xx,2.755,.335),(xx,2.755,.425),.016,M['black'],plane,8)
+        beam('Aileron moving hinge',(xx-pivot[0],0,0),(xx-pivot[0],0,.105),.014,M['silver'],control,8)
+    # A small moving control horn gives a clear visual cue without a fake wing flap.
+    box('Aileron control horn',(0,-.095,.12),(.025,.18,.10),M['silver'],.008,control)
+
+# Horizontal stabilizer and separately hinged left/right elevators.
+box('Fixed horizontal stabilizer',(0,1.9,2.575),(4.6,.14,.75),M['yellow'],.055,plane)
+box('Tail center fairing',(0,1.9,3.16),(.43,.14,.48),M['yellow'],.04,plane)
+for sign,side in [(-1,'Left'),(1,'Right')]:
+    pivot=(sign*1.25,1.90,2.97)
+    control=empty('PlaneElevator'+side);control.parent=plane;control.location=v(pivot)
+    xa,xb=sorted([sign*.25,sign*2.25]);ta,tb=sorted([sign*.25,sign*2.14])
+    verts=[(xa-pivot[0],-.058,.025),(xb-pivot[0],-.058,.025),(tb-pivot[0],-.012,.43),(ta-pivot[0],-.012,.43),(xa-pivot[0],.058,.025),(xb-pivot[0],.058,.025),(tb-pivot[0],.012,.43),(ta-pivot[0],.012,.43)]
+    o=mesh('Moving elevator '+side,verts,[(0,3,2,1),(4,5,6,7),(0,1,5,4),(3,7,6,2),(0,4,7,3),(1,2,6,5)],M['yellow'],control)
+    bm=bmesh.new();bm.from_mesh(o.data);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(o.data);bm.free()
+    for xx in [sign*.55,sign*1.9]:
+        beam('Elevator hinge barrel',(xx-.045,1.9,2.97),(xx+.045,1.9,2.97),.020,M['silver'],plane,12)
+        beam('Elevator fixed hinge strap',(xx,1.9,2.88),(xx,1.9,2.97),.014,M['black'],plane,8)
+        beam('Elevator moving hinge',(xx-pivot[0],0,0),(xx-pivot[0],0,.10),.012,M['silver'],control,8)
+    box('Elevator control horn',(0,-.085,.13),(.025,.16,.085),M['silver'],.006,control)
+
+# The fin ends at a vertical hinge; the trailing rudder is genuinely separate.
+fin=mesh('Fixed vertical stabilizer',[(-.06,1.75,2.6),(-.06,4,3),(-.06,4,3.325),(-.06,1.75,3.325),(.06,1.75,2.6),(.06,4,3),(.06,4,3.325),(.06,1.75,3.325)],[(0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)],M['yellow'],plane)
+bm=bmesh.new();bm.from_mesh(fin.data);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(fin.data);bm.free()
+rudder=empty('PlaneRudder');rudder.parent=plane;rudder.location=v((0,2.875,3.345))
+rudder_skin=mesh('Moving rudder',[(-.045,-.775,.02),(-.045,1.125,.02),(-.012,1.125,.275),(-.012,-.775,.355),(.045,-.775,.02),(.045,1.125,.02),(.012,1.125,.275),(.012,-.775,.355)],[(0,1,2,3),(4,7,6,5),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)],M['yellow'],rudder)
+bm=bmesh.new();bm.from_mesh(rudder_skin.data);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(rudder_skin.data);bm.free()
+for yy in [2.25,2.95,3.8]:
+    beam('Rudder hinge barrel',(0,yy-.045,3.345),(0,yy+.045,3.345),.020,M['silver'],plane,12)
+    beam('Rudder fixed hinge strap',(0,yy,3.25),(0,yy,3.345),.014,M['black'],plane,8)
+    beam('Rudder moving hinge',(0,yy-2.875,0),(0,yy-2.875,.11),.012,M['silver'],rudder,8)
+box('Rudder control horn',(.10,-.70,.13),(.22,.025,.09),M['silver'],.006,rudder)
+# Runtime convention after glTF conversion: +X lowers horizontal trailing edges;
+# +Y swings the rudder trailing edge to aircraft right (+X). Deflect at most20°.
+
 for x in [-1.3,1.3]:
     ellipsoid('Float',(x,.16,-.25),(.35,.32,3.2),M['silver'],plane)
     for z in [-1.8,1.5]:beam('Float strut',(x,.38,z),(x*.45,1.35,z),.045,M['silver'],plane)
@@ -488,7 +580,6 @@ for x in [-1.3,1.3]:
     box('Water rudder',(x,-.12,2.65),(.07,.55,.38),M['black'],.03,plane)
     beam('Water rudder linkage',(x,.42,2.3),(x,-.12,2.65),.025,M['silver'],plane)
 for sign in [-1,1]:
-    beam('Aileron hinge',(sign*3,2.72,.57),(sign*5.8,2.8,.55),.012,M['black'],plane,6)
     beam('Wing leading seam',(sign*.8,2.72,-1.1),(sign*5.4,2.75,-1.1),.012,M['silver'],plane,6)
     beam('Wing second brace',(sign*.6,1.35,-.9),(sign*5.2,2.65,-.7),.035,M['silver'],plane)
     beam('Tail brace',(sign*.35,1.6,2),(sign*1.9,1.92,2.9),.018,M['silver'],plane,8)

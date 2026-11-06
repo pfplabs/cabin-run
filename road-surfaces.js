@@ -32,11 +32,22 @@ export function createGravelMaterial(){
  return new THREE.MeshStandardMaterial({map,bumpMap:bump,bumpScale:.035,roughness:.98,color:0xffffff});
 }
 export function isGravel(x,z){
+ let driveDistance=Infinity;
+ for(let i=1;i<DRIVEWAY.length;i++){const a=DRIVEWAY[i-1],b=DRIVEWAY[i],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);driveDistance=Math.min(driveDistance,Math.hypot(x-a.x-t*dx,z-a.z-t*dz));}
+ if(driveDistance<2.25)return false;
+ if(driveDistance<3.7)return true;
  const d=Math.abs(roadOffset(x,z));if(d>=4.2&&d<7.5)return true;
- if(x>-26.5&&x<-5&&z>-18&&z<-2)return true;
- for(let i=1;i<DRIVEWAY.length;i++){
-  const a=DRIVEWAY[i-1],b=DRIVEWAY[i],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);
-  if(Math.hypot(x-a.x-t*dx,z-a.z-t*dz)<2.7)return true;
+ return x>-26.5&&x<-5&&z>-18&&z<-2;
+}
+
+/** Trim branch asphalt at the main-road edge, avoiding stacked junction faces. */
+export function clipRibbonOutsideRoad(geometry,centerline,halfWidth){
+ const position=geometry.attributes.position,uv=geometry.attributes.uv,index=geometry.index,positions=[],uvs=[];
+ function distance(x,z){let best=Infinity;for(let i=1;i<centerline.length;i++){const a=centerline[i-1],b=centerline[i],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);best=Math.min(best,Math.hypot(x-a.x-t*dx,z-a.z-t*dz));}return best-halfWidth;}
+ const vertex=i=>({x:position.getX(i),y:position.getY(i),z:position.getZ(i),u:uv.getX(i),v:uv.getY(i),d:distance(position.getX(i),position.getZ(i))});
+ for(let i=0;i<index.count;i+=3){const poly=[vertex(index.getX(i)),vertex(index.getX(i+1)),vertex(index.getX(i+2))],clipped=[];
+  for(let j=0;j<poly.length;j++){const a=poly[j],b=poly[(j+1)%poly.length],insideA=a.d>=0,insideB=b.d>=0;if(insideA)clipped.push(a);if(insideA!==insideB){const t=a.d/(a.d-b.d),p={};for(const k of ['x','y','z','u','v'])p[k]=a[k]+(b[k]-a[k])*t;clipped.push(p);}}
+  for(let j=1;j<clipped.length-1;j++)for(const p of [clipped[0],clipped[j],clipped[j+1]]){positions.push(p.x,p.y,p.z);uvs.push(p.u,p.v);}
  }
- return false;
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.computeVertexNormals();return g;
 }

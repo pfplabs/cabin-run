@@ -2,9 +2,10 @@
 
 Fetched 5 November 2026. These texture files are local and require no runtime network requests. Original texture bytes are unmodified. Runtime material tinting, tiling and shader blending are modifications in the rendered appearance.
 
-## Blouberg Sunrise 2 HDR
+## Blouberg Sunrise 2 HDR (archived, no longer loaded)
 
 - File: `blouberg_sunrise_2_1k.hdr`
+- Retained from an earlier revision. The running game now uses a procedural natural sky and sky-only environment reflections, not this photographed skyline.
 - Work: **Blouberg Sunrise 2**, Poly Haven / formerly HDRI Haven.
 - Original asset: https://polyhaven.com/a/blouberg_sunrise_2
 - License: CC0, https://polyhaven.com/license

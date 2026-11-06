@@ -11,3 +11,14 @@ test('propeller blur is a transparent disc normal to the spin axis',()=>{
  const b=createPropellerBlur(),p=b.geometry.attributes.position;assert.equal(b.material.transparent,true);assert.equal(b.material.depthWrite,false);assert.equal(b.material.uniforms.amount.value,0);
  for(let i=0;i<p.count;i++)assert.equal(p.getZ(i),0);assert.ok(p.array.every(Number.isFinite));
 });
+
+test('landing corridor uses real paired buoys along the exported water approach',async()=>{
+ const {createLandingCorridor}=await import('../flight-effects.js');const {LANDING_CORRIDOR}=await import('../engine.js');const group=createLandingCorridor(LANDING_CORRIDOR);
+ assert.equal(group.children.length,2);for(const mesh of group.children){assert.equal(mesh.count,28);assert.ok(mesh.instanceMatrix.array.every(Number.isFinite));}
+});
+test('water wake and touchdown spray are bounded and decay after physical contact',async()=>{
+ const {WaterWake}=await import('../flight-effects.js');const wake=new WaterWake(),state={phase:'plane',status:'running',onWater:true,parked:false,x:-25,z:100,heading:0,speed:10,touchdownAge:-1};
+ for(let i=0;i<30;i++)wake.update(state,1/60);assert.ok(wake.pool.some(p=>p.age<p.life));
+ state.touchdownAge=0;wake.update(state,1/60);assert.ok(wake.pool.some(p=>p.vy>1));assert.equal(wake.pool.length,160);assert.ok(wake.geometry.attributes.position.array.every(Number.isFinite));
+ state.speed=0;for(let i=0;i<240;i++){state.touchdownAge+=1/60;wake.update(state,1/60);}assert.equal(wake.pool.filter(p=>p.age<p.life).length,0);
+});

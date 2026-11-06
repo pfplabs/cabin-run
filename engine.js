@@ -1,20 +1,22 @@
 /** Pure simulation rules for a small bounded alpine lake. Distances are metres. */
-export const WORLD={scale:2,roadRadius:188,centerZ:124,northLimit:-92,flightNorthLimit:-90,flightCeiling:84};
+export const WORLD={scale:6,roadRadius:564,centerZ:352,northLimit:-302,flightNorthLimit:-300,flightCeiling:140};
 export const JEEP={maxSpeed:22,boostSpeed:28,reverseSpeed:6,wheelbase:2.8,halfTrack:.95,maxSteeringAngle:.55,maxLateralAcceleration:9,acceleration:4.8,braking:8.5};
 export const CABIN_BOUNDS={minX:-4.2,maxX:25.2,minZ:-28,maxZ:-.8,roofHeight:13};
 const jeepState=()=>({steeringAngle:0,acceleration:0,suspensionVelocity:0,groundHeight:null});
-export const FLIGHT={maxSpeed:27,waterHeight:.3,liftSpeed:10,throttleRate:.3,idleRPM:650,maxRPM:2600};
-export const FLIGHT_BOUNDARY={warningRadius:1.02,normalRadius:1.13,graceRadius:1.5,hardRadius:1.65,warningNorth:-70,normalNorth:-90,graceNorth:-155,hardNorth:-180,returnSeconds:8};
-const flightState=()=>({throttle:0,propRPM:0,verticalSpeed:0,yawRate:0,onWater:false,boundaryStatus:'inside',boundaryRemaining:FLIGHT_BOUNDARY.returnSeconds});
-export const LAKE={x:0,z:124,rx:156,rz:114};
+export const FLIGHT={maxSpeed:27,waterHeight:.10,liftSpeed:10,throttleRate:.3,idleRPM:650,maxRPM:2600,startupSeconds:3,waterBrake:7};
+export const LANDING_CORRIDOR={centerX:-25,zStart:250,zEnd:40,width:36,heading:0};
+export const FLIGHT_BOUNDARY={warningRadius:1.02,normalRadius:1.13,graceRadius:1.5,hardRadius:1.65,warningNorth:WORLD.centerZ-WORLD.roadRadius*1.02,normalNorth:WORLD.centerZ-WORLD.roadRadius*1.13,graceNorth:WORLD.centerZ-WORLD.roadRadius*1.5,hardNorth:WORLD.centerZ-WORLD.roadRadius*1.65,returnSeconds:8};
+const flightState=()=>({enginePhase:'off',engineStartRemaining:0,landingStatus:'taxi',landingAligned:false,touchdownAge:-1,elevatorAngle:0,aileronAngle:0,rudderAngle:0,throttle:0,propRPM:0,verticalSpeed:0,yawRate:0,onWater:false,boundaryStatus:'inside',boundaryRemaining:FLIGHT_BOUNDARY.returnSeconds});
+export const LAKE={x:0,z:352,rx:468,rz:342};
 export const TUNNEL={startAngle:.08,endAngle:.36,innerHalfWidth:5.4,outerHalfWidth:11,height:6.4};
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
-const routeRadius=a=>WORLD.roadRadius+12*Math.sin(3*a)+6*Math.sin(7*a);
-const routeHeight=a=>1.1+34*Math.exp(-((wrap(a-.2)/.78)**2));
+const routeRadius=a=>WORLD.roadRadius+36*Math.sin(3*a)+18*Math.sin(7*a);
+const routeHeight=a=>1.1+70*Math.exp(-((wrap(a-.2)/.78)**2));
 export function roadPoint(a){const r=routeRadius(a);return {x:r*Math.sin(a),y:routeHeight(a),z:WORLD.centerZ-r*Math.cos(a)};}
 export function roadOffset(x,z){const a=Math.atan2(x,WORLD.centerZ-z);return Math.hypot(x,z-WORLD.centerZ)-routeRadius(a);}
-export const DRIVEWAY=[roadPoint(-.65),{x:-83,z:-7,y:8},{x:-58,z:-14,y:5.5},{x:-37,z:-19,y:3},{x:-23,z:-15,y:1.1},{x:-16,z:-9,y:1.1},{x:-18,z:3,y:1.1}];
-export const DOCK={x:-25,z:16};
+export const DRIVEWAY=[roadPoint(-.65),{x:-230,z:-28,y:14.5},{x:-130,z:-19,y:8.5},{x:-58,z:-14,y:4},{x:-37,z:-19,y:2},{x:-23,z:-15,y:1.1},{x:-16,z:-9,y:1.1},{x:-18,z:3,y:1.1}];
+export const DOCK={x:-23.7,z:30};
+export const DOCK_BOUNDS={minX:-21.20,maxX:-14.925,minZ:2,maxZ:36,maxY:2.025};
 export const HOME={x:-16,z:-9};
 export const PARKING=[{x:-23,z:-11,width:4.6,length:7},{x:-16,z:-11,width:4.6,length:7},{x:-9,z:-11,width:4.6,length:7}];
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -47,13 +49,18 @@ export function switchVehicle(s,vehicle){
  if(!['jeep','plane'].includes(vehicle))return false;
  Object.assign(s,flightState(),jeepState());s.phase=vehicle;s.speed=0;s.roll=0;s.pitch=0;s.actionReady=false;s.takeoff=0;s.parked=false;s.arrived=false;
  if(vehicle==='jeep'){const p=roadPoint(-1.82),q=roadPoint(-1.819);s.x=p.x;s.z=p.z;s.y=terrainHeight(s.x,s.z);s.heading=Math.atan2(q.x-p.x,p.z-q.z);}
- else {s.x=-40;s.z=218;s.y=FLIGHT.waterHeight;s.heading=0;s.onWater=true;s.propRPM=FLIGHT.idleRPM;}
+ else {s.x=-40;s.z=591;s.y=FLIGHT.waterHeight;s.heading=0;s.onWater=true;s.propRPM=0;}
  return true;
 }
 export function action(s){
  if(s.status!=='running')return false;
- if(s.parked){Object.assign(s,flightState(),{parked:false,onWater:true,propRPM:FLIGHT.idleRPM,speed:0,pitch:0,roll:0,heading:Math.PI});s.events.push({type:'takeoff',text:'Ready on the water. Hold Shift to accelerate, then W to lift off.'});return true;}
- if(s.phase==='plane'&&s.actionReady){s.x=DOCK.x;s.z=DOCK.z;s.y=.3;s.speed=0;s.heading=-1.4;s.parked=true;s.actionReady=false;Object.assign(s,flightState(),{onWater:true});s.pitch=0;s.roll=0;s.events.push({type:'land',text:'Welcome home. Floatplane moored at the dock.'});return true;}
+ if(s.parked){Object.assign(s,flightState(),{parked:false,onWater:true,speed:0,pitch:0,roll:0,heading:Math.PI});s.events.push({type:'unmoor',text:'Unmoored. Press Space to start the engine.'});return true;}
+ if(s.phase==='plane'){
+  if(s.enginePhase==='off'){s.enginePhase='starting';s.engineStartRemaining=FLIGHT.startupSeconds;s.throttle=0;s.events.push({type:'engine_start',text:'Starting engine. Wait for the propeller to settle at idle.'});return true;}
+  if(s.enginePhase==='starting')return false;
+  if(s.actionReady&&s.onWater&&s.speed<3){s.speed=0;s.parked=true;s.actionReady=false;Object.assign(s,flightState(),{onWater:true});s.events.push({type:'land',text:'Moored at the dock. Engine off.'});return true;}
+  return false;
+ }
  if(s.phase==='jeep'&&s.actionReady){s.speed=0;s.acceleration=0;s.yawRate=0;s.events.push({type:'home',text:'Home by the lake. Keep exploring or take the floatplane.'});return true;}
  return false;
 }
@@ -111,7 +118,7 @@ function updateJeep(s,input,steer,dt){
  s.heading+=s.yawRate*dt;
  const nx=s.x+Math.sin(s.heading)*s.speed*dt,nz=s.z-Math.cos(s.heading)*s.speed*dt;
  const c=CABIN_BOUNDS,hitCabin=nx>c.minX&&nx<c.maxX&&nz>c.minZ&&nz<c.maxZ;
- const hitShore=lakeRadius(nx,nz)<1.035,hitBound=roadRadius(nx,nz)>1.14||nz<WORLD.northLimit;
+ const hitShore=lakeRadius(nx,nz)<1+4/LAKE.rz,hitBound=roadRadius(nx,nz)>1.14||nz<WORLD.northLimit;
  const angle=Math.atan2(nx,WORLD.centerZ-nz),offset=Math.abs(roadOffset(nx,nz));
  const hitTunnel=angle>=TUNNEL.startAngle&&angle<=TUNNEL.endAngle&&offset>TUNNEL.innerHalfWidth-1.2&&offset<TUNNEL.outerHalfWidth+1.2;
  if(hitCabin||hitShore||hitBound||hitTunnel){
@@ -125,7 +132,7 @@ function updateJeep(s,input,steer,dt){
 }
 function flightGroundHeight(x,z){
  const outer=roadRadius(x,z),rise=Math.max(0,outer-1.17);
- return Math.max(terrainHeight(x,z),1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22));
+ return Math.max(terrainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
 }
 function flightClearance(x,z){
  const angle=Math.atan2(x,WORLD.centerZ-z),offset=Math.abs(roadOffset(x,z));
@@ -151,37 +158,72 @@ function updateBoundary(s,dt){
 }
 function updatePlane(s,input,steer,dt){
  updateBoundary(s,dt);
+ const wasOnWater=s.onWater&&s.y<=FLIGHT.waterHeight+.01;
+ s.onWater=wasOnWater;
+ if(s.touchdownAge>=0)s.touchdownAge+=dt;
+ if(s.enginePhase==='starting'){
+  s.engineStartRemaining=Math.max(0,s.engineStartRemaining-dt);
+  s.throttle=0;
+  const progress=1-s.engineStartRemaining/FLIGHT.startupSeconds;
+  s.propRPM=FLIGHT.idleRPM*smooth(progress);
+  if(s.engineStartRemaining<1e-8){s.engineStartRemaining=0;s.enginePhase='running';s.events.push({type:'engine_ready',text:'Engine ready. Shift adds power; W lifts off after the takeoff run.'});}
+ }
+ const engineReady=s.enginePhase==='running';
+ if(engineReady){
+  s.throttle=clamp(s.throttle+((input.boost?1:0)-(input.brake?1:0))*FLIGHT.throttleRate*dt,0,1);
+  s.propRPM=approach(s.propRPM,FLIGHT.idleRPM+(FLIGHT.maxRPM-FLIGHT.idleRPM)*s.throttle,2.2,dt);
+ }else if(s.enginePhase==='off'){s.throttle=0;s.propRPM=approach(s.propRPM,0,3,dt);}
  const recovering=s.boundaryStatus==='recovering';
- s.throttle=clamp(s.throttle+((input.boost?1:0)-(input.brake?1:0))*FLIGHT.throttleRate*dt,0,1);
- s.propRPM=approach(s.propRPM,FLIGHT.idleRPM+(FLIGHT.maxRPM-FLIGHT.idleRPM)*s.throttle,2.2,dt);
  const targetSpeed=recovering?Math.min(16,Math.max(12,s.throttle*FLIGHT.maxSpeed)):s.throttle*FLIGHT.maxSpeed;
  const speedDelta=(targetSpeed-s.speed)*(1-Math.exp(-.65*dt));
  s.speed=clamp(s.speed+clamp(speedDelta,-3.8*dt,3.1*dt),0,FLIGHT.maxSpeed);
+ if(s.onWater&&input.brake)s.speed=Math.max(0,s.speed-FLIGHT.waterBrake*dt);
+ if(s.speed<.02&&!s.throttle)s.speed=0;
  const authority=clamp(s.speed/10,0,1);
  let targetYaw=steer*.65*authority;
  if(recovering){const inward=Math.atan2(-s.x,s.z-WORLD.centerZ);targetYaw=clamp(wrap(inward-s.heading)*1.4,-.65,.65);}
  s.yawRate=approach(s.yawRate,targetYaw,2.5,dt);s.heading+=s.yawRate*dt;
  s.roll=approach(s.roll,-s.yawRate/.65*(s.onWater?.055:.42),3,dt);
  const pitchInput=(input.up?1:0)-(input.down?1:0);
- s.pitch=approach(s.pitch,pitchInput*(s.onWater&&s.speed<FLIGHT.liftSpeed?.075:.3),2,dt);
- if(s.onWater&&s.speed>=FLIGHT.liftSpeed&&s.pitch>.05)s.onWater=false;
- // Neutral pitch levels the aircraft. Low throttle settles it gently instead of stalling.
+ s.elevatorAngle=approach(s.elevatorAngle,pitchInput*.22,6,dt);
+ s.aileronAngle=approach(s.aileronAngle,steer*.25,6,dt);
+ s.rudderAngle=approach(s.rudderAngle,steer*.22,6,dt);
+ const flaring=!s.onWater&&s.y<3.5&&s.verticalSpeed<0&&s.speed<20&&pitchInput<1&&lakeRadius(s.x,s.z)<.98;
+ let targetPitch=pitchInput*(s.onWater&&s.speed<FLIGHT.liftSpeed?.075:.3);
+ if(flaring)targetPitch=Math.max(.045,targetPitch);
+ s.pitch=approach(s.pitch,targetPitch,2,dt);
+ if(s.onWater&&engineReady&&s.speed>=FLIGHT.liftSpeed&&s.pitch>.05)s.onWater=false;
+ // A gentle flare cushions water contact; no scripted position jump or forced landing.
  let climb=s.onWater?0:clamp(Math.sin(s.pitch)*s.speed,-7,7)-(s.speed<8?(8-s.speed)*.2:0);
+ if(flaring)climb=-clamp((s.y-FLIGHT.waterHeight)*.7,.25,1.2);
  const ahead=Math.max(8,s.speed*1.25),forwardX=Math.sin(s.heading),forwardZ=-Math.cos(s.heading);
  const aheadX=s.x+forwardX*ahead,aheadZ=s.z+forwardZ*ahead;
- const aheadClearance=s.onWater&&lakeRadius(aheadX,aheadZ)<.99?FLIGHT.waterHeight:flightClearance(aheadX,aheadZ);
- if(aheadClearance>s.y)climb=Math.max(climb,clamp((aheadClearance-s.y)*1.6,0,10));
+ const aheadClearance=s.onWater&&lakeRadius(aheadX,aheadZ)<.995?FLIGHT.waterHeight:flightClearance(aheadX,aheadZ);
+ if(aheadClearance>s.y&&(!s.onWater||s.speed>FLIGHT.liftSpeed*.8))climb=Math.max(climb,clamp((aheadClearance-s.y)*1.6,0,10));
  s.verticalSpeed=approach(s.verticalSpeed,climb,2.2,dt);
- s.x+=forwardX*s.speed*dt;s.z+=forwardZ*s.speed*dt;
+ const nextX=s.x+forwardX*s.speed*dt,nextZ=s.z+forwardZ*s.speed*dt;
+ const floatHalfX=Math.abs(Math.cos(s.heading))*1.7+Math.abs(Math.sin(s.heading))*3.3,floatHalfZ=Math.abs(Math.sin(s.heading))*1.7+Math.abs(Math.cos(s.heading))*3.3;
+ const hitPier=s.onWater&&nextX+floatHalfX>DOCK_BOUNDS.minX&&nextX-floatHalfX<DOCK_BOUNDS.maxX&&nextZ+floatHalfZ>DOCK_BOUNDS.minZ&&nextZ-floatHalfZ<DOCK_BOUNDS.maxZ;
+ if(hitPier){if(s.speed>1)bump(s,'Pier ahead. Slow and steer away from the pilings.');s.speed=0;}else{s.x=nextX;s.z=nextZ;}
  const b=FLIGHT_BOUNDARY,r=roadRadius(s.x,s.z);
- // This distant safety boundary never snaps heading; the recovery turn remains gradual.
  if(r>b.hardRadius){s.x*=b.hardRadius/r;s.z=WORLD.centerZ+(s.z-WORLD.centerZ)*b.hardRadius/r;}
  s.z=Math.max(s.z,b.hardNorth);
- const clearance=s.onWater&&lakeRadius(s.x,s.z)<.99?FLIGHT.waterHeight:flightClearance(s.x,s.z);
+ const clearance=s.onWater&&lakeRadius(s.x,s.z)<.995?FLIGHT.waterHeight:flightClearance(s.x,s.z);
+ const contactSpeed=s.verticalSpeed;
  s.y=clamp(s.y+s.verticalSpeed*dt,clearance,WORLD.flightCeiling);
  if(s.y>=WORLD.flightCeiling&&s.verticalSpeed>0)s.verticalSpeed=0;
  if(s.y<=clearance&&s.verticalSpeed<0)s.verticalSpeed=0;
  s.onWater=s.y<=FLIGHT.waterHeight+.001&&lakeRadius(s.x,s.z)<1;
- if(s.onWater)s.verticalSpeed=0;
- s.actionReady=Math.hypot(s.x-DOCK.x,s.z-DOCK.z)<20&&s.y<18&&s.speed<13;
+ const corridor=LANDING_CORRIDOR;
+ const inCorridor=Math.abs(s.x-corridor.centerX)<=corridor.width/2&&s.z>=corridor.zEnd&&s.z<=corridor.zStart;
+ s.landingAligned=inCorridor&&Math.abs(wrap(s.heading-corridor.heading))<Math.PI/7;
+ if(s.onWater){
+  s.verticalSpeed=0;
+  if(!wasOnWater){s.touchdownAge=0;s.events.push({type:'touchdown',text:inCorridor?'Touchdown in the landing corridor. Hold Control to slow on the water.':'Touchdown. Hold Control to slow on the water.',speed:s.speed,verticalSpeed:contactSpeed,inCorridor});}
+  s.landingStatus=s.touchdownAge>=0&&s.touchdownAge<2.5?'touchdown':'taxi';
+ }else {
+  if(wasOnWater){s.touchdownAge=-1;s.events.push({type:'takeoff',text:'Airborne. Reduce power with Control before your landing approach.'});}
+  s.landingStatus=s.landingAligned&&s.y<25&&s.speed<21?'approach':'airborne';
+ }
+ s.actionReady=s.enginePhase==='running'&&s.onWater&&Math.hypot(s.x-DOCK.x,s.z-DOCK.z)<10&&s.speed<3;
 }

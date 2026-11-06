@@ -1,36 +1,42 @@
 # Verification record
 
-## Expanded lake update: automated checks passed
-- `node --check` for `game.js`, `engine.js`, `environment.js`, `foliage.js`, `camera-rig.js` and the capture helper.
-- `npm test`: 55 deterministic tests (24 simulation, 11 camera input, 3 camera obstruction, 6 environment, 5 material, 2 flight-effect and 4 road/dust checks).
-- Simulation covers a complete winding road circuit through the tunnel, continuous road-to-driveway-to-cabin travel, launch-to-dock travel, reversing away from tunnel walls, elevated terrain, boundaries and bounded vehicle speeds. Lake area is verified as exactly four times the first version.
-- Camera tests cover both vehicle targets, mouse orbit and wheel zoom, touch orbit/pinch, concurrent driving touches, zoom limits, pause/resume and cleanup. These include trackpad horizontal/diagonal/vertical-tail events, pinch, heading wraparound and desired-camera retention through obstruction. They are simulated DOM tests, not physical-device tests.
-- Environment tests inspect upward-facing ground, an empty traversable tunnel volume with real walls and roof, sandbar position, connected parking and finite instanced shore geometry.
-- `node scripts/inspect-scene.mjs`: actual GLB parsing, 50 mesh primitives, 132,684 triangles, 29 materials, named JeepRoot / PlaneRoot / Propeller, finite vertices. Model source reopens in Blender 4.3.2.
-- Main branch and the old prototype are preserved. No deployment has been performed.
+## Current automated checks
 
-## Previous iteration: Mac browser verified
-A real Mac browser rendered the earlier scene and verified jeep acceleration/steering, aircraft climb/turn, pause, vehicle switching, boundary recovery and active reflections. That pass identified metallic-looking water, angular shoreline, sparse repeated trees, dark terrain and simplified vehicle surfaces. The expanded update specifically addresses these, but visual improvement is not asserted without a new browser capture.
+- `npm test`: 83 tests passed against the integrated source.
+- `node scripts/inspect-scene.mjs`: actual glTF parsing, 60 mesh primitives, 143,234 triangles, 29 materials; named vehicle, wheel, propeller and five aircraft control pivots preserved. All vertices finite.
+- Syntax checks pass for application, simulation, camera, environment, LOD, daylight, particle and recording modules.
+- Blender source reopens and exports. Human-scale cabin doors/stairs, aircraft hinge axes and extended-pier clearances were measured in the real geometry.
+- All five aircraft control surfaces passed fixed-skin intersection checks at −20°, −15°, 0°, 15° and 20°.
 
-## Expanded update: browser QA still needed
-The managed cloud Chromium disables WebGL. Automated simulation and geometry checks do not establish visual quality or frame rate.
+Simulation tests include keyboard driving through the complete winding road and tunnel, the driveway/parking approach, 22/28 m/s speed limits, smooth braking/reverse, and equal scripted results at 30/60/120 FPS. Plane tests cover three-second startup, throttle lockout, taxi, takeoff, aligned approach, physical touchdown, water braking and explicit mooring without position teleportation. Pause/reset and boundary return/recovery are covered.
 
-Run `python3 -m http.server 4173` and visit `http://localhost:4173/?qa=1` in a WebGL 2 browser:
-1. Confirm no console or network errors and inspect `cabinDiagnostics()`.
-2. Drive the entire winding road in both directions, including hill and tunnel. Inspect road/ground alignment, tunnel clearance, headlights, wheel animation and reversing recovery.
-3. Take the gravel turnoff to the cabin, enter all three parking bays, and check driveway connectivity without visual terrain clipping.
-4. Hit shoreline, cabin and outer boundary. Verify bounded motion and recovery by reversing.
-5. Switch to the plane: start idling on water, raise throttle with Shift, lift with W, release to hold power and lower it with Control. Check gradual speed, pitch/bank, RPM-linked blades and blur. Moor below 47 km/h, release, then throttle up for another takeoff. Fly past the visible boundary, turn back during its countdown, and test gradual assisted recovery.
-6. Drag orbit and scroll zoom around both vehicles while moving. Test horizontal/diagonal trackpad swipe orbit, pinch zoom and Shift+scroll fallback. Verify heading follow and preserved relative orbit. Drive through both tunnel portals in both directions: camera must tuck/duck, keep the jeep in view and smoothly restore zoom outside.
-7. Pause/resume during drag, restart from pause, switch tabs and return. Check for stuck input and time jumps.
-8. On a real touch device, use one-finger orbit and pinch while simultaneously holding driving controls. Check the 390 × 844 layout.
-9. Inspect water color/reflections, shoreline smoothness, trees, model detail, lighting and sustained frame rate on the actual target desktop and mobile devices. No photorealistic parity is claimed.
-10. Record a final gameplay trailer only after the user is satisfied. Keep Blender previews labeled separately.
+Geometry tests raycast the actual land and driveway, check trimmed asphalt junctions, maintain a clear 10.4 m-wide tunnel envelope and camera sight lines, and prove that all three tunnel apertures are real openings with solid reveals and clear views toward lake water. Ground, dock, cabin, shore margins and flight clearances use the larger world's current coordinates.
 
-QA-only setup: `cabinQA.start()`, `cabinQA.switchVehicle()`, `cabinQA.setMode('cabin')`. State changes can arrange a test or shot; actual recorded motion must come from frame-by-frame simulation, with staged starts disclosed where relevant. Do not substitute synthetic renders for gameplay.
+The dock berth is at X−23.7/Z30 with aircraft root Y0.10. At both parallel headings, the model has 0.67 m wing-to-pier vertical clearance and 0.85 m pontoon-to-fender horizontal clearance, with 0.06 m pontoon immersion. Taxi collision prevents entering the pier footprint.
 
-## Latest material pass
-Original packed procedural texture supplies granite weathering, strata, mineral grain, surface-normal detail and roughness. Terrain mixes grass, soil, wet/dry shore and slope rock; decorative boulders have welded smooth normals. CPU tests validate shader patch construction and geometry. Shader compilation and visual quality are NOT verified until a fresh Mac/browser pass. No new external assets were downloaded.
+Forest tests preserve all 9,500 seeded locations, validate detailed/card fades, distance culling and reflection-safe visibility. Terrain tiles preserve all original triangles and share vertex buffers. Daylight tests cover cycle continuity, minimum brightness, sun elevation and matching sky/water/light state. These CPU tests do not prove GPU shader compilation or frame rate.
 
-## Jeep, driveway and cabin revision
-Jeep integration uses 120 Hz substeps, smoothed speed-sensitive steering, capped lateral grip and damped four-wheel suspension. Identical scripted runs at30/60/120fps agree within1e-8; a full-speed keyboard-following test completes the road/tunnel without collision. Normal/boost limits are22/28m/s. Asphalt widened to8.4m, tunnel opening10.8m. The former seven-station driveway ribbon was replaced with metre-spaced sections; raycasts across its usable width verify the actual road surface stays above the rendered land. Gravel dust is bounded, speed-dependent and absent on asphalt. The larger cabin foundation, collision bounds, flight clearance and foliage exclusion are aligned. These are automated checks; updated visual feel, dust and architecture still require Mac browser inspection.
+## What was played previously
+
+Earlier revisions were rendered and played in a real Mac browser. Jeep/plane controls, pause, switching, reflections and boundary behavior were observed. User feedback drove this revision's camera, handling, road, tunnel, dock, world-size and lighting changes. That earlier play does not verify the latest integrated revision.
+
+## Fresh browser pass required
+
+The cloud browser disables WebGL. No current gameplay video, photorealistic parity or measured FPS is claimed here.
+
+Run `python3 -m http.server 4173`, then open `http://localhost:4173/?qa=1`:
+
+1. Confirm all assets load and no shader/console errors occur. Inspect `cabinDiagnostics()`.
+2. Drive the road at normal/boost speeds, brake, reverse and use both lanes through both tunnel portals. Look through all three openings. Confirm no boulder intrusion, camera clipping or road/land overlap.
+3. Follow the paved cabin branch. Check the matching asphalt junction, gravel shoulders, dust, parking apron and enlarged cabin.
+4. Switch to the plane. Space starts the engine; wait for idle. Shift adds power, W lifts, A/D banks, S descends. Inspect RPM-linked blades/blur and actual hinged surfaces.
+5. Fly the buoy corridor, reduce power, descend to a real water touchdown, then hold Control to slow. Inspect spray/wake. Taxi beside the longer pier and moor below 11 km/h. Unmoor, restart and take off again.
+6. Test the visible world boundary, manual return countdown and gradual recovery. Check clear ground/roof/pier separation.
+7. Test steering-follow orbit, drag, trackpad horizontal/diagonal swipe, pinch, ordinary wheel and Shift+scroll fallback. Repeat pause/resume mid-drag, vehicle switches and focus loss. Test physical touch separately.
+8. Inspect the natural sky and terrain. The photographed city skyline must be absent. Observe daylight/golden-hour changes, matching water highlights/reflections and no dark-night interval.
+9. Drive/fly for at least 30–60 seconds and sample `cabinDiagnostics()`. It reports average browser frame rate and p95 frame interval, renderer counts, forest submission estimates and terrain tile count. Check visible LOD transitions and reflection continuity. Record actual device, window size and pixel ratio when comparing performance.
+10. Capture current browser screenshots for visual review. Make the final trailer only after the user is satisfied. Never substitute Blender previews or generated frames for gameplay.
+
+## Known scope boundaries
+
+This is a compact, forgiving exploration game, not a full vehicle/flight simulator. The V key is a scene selector. Cockpit views are deferred until after visual work. Current artwork remains an iteration toward the reference, not a claim of photographic equivalence. The final trailer and retrospective article have not been produced or published.

@@ -1,27 +1,29 @@
 import * as THREE from 'three';
 import {createRockMaterial,createGraniteGeometry} from './landscape-materials.js';
-import {LAKE,WORLD,terrainHeight,roadPoint,TUNNEL,PARKING} from './engine.js';
+import {clipRibbonOutsideRoad,createGravelMaterial} from './road-surfaces.js';
+import {LAKE,WORLD,terrainHeight,roadPoint,TUNNEL,PARKING,DRIVEWAY} from './engine.js';
 
 const smooth=(a,b,x)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 export function landscapeHeight(x,z){
  const lake=Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz);
- if(lake<.97)return -3;
- if(lake<1.035)return THREE.MathUtils.lerp(-3,terrainHeight(x,z),smooth(.97,1.035,lake));
+ const shoreInner=1-3.42/LAKE.rz,shoreOuter=1+3.99/LAKE.rz;
+ if(lake<shoreInner)return -3;
+ if(lake<shoreOuter)return THREE.MathUtils.lerp(-3,terrainHeight(x,z),smooth(shoreInner,shoreOuter,lake));
  const outer=Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius);
  if(outer<1.17)return terrainHeight(x,z);
  const rise=outer-1.17;
- return Math.max(terrainHeight(x,z),1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22));
+ return Math.max(terrainHeight(x,z),2*(1+rise*37+Math.pow(rise,1.35)*24+Math.sin(x*.028)*Math.cos(z*.025)*Math.min(23,rise*22)));
 }
 
 /** Shore-focused annular topology keeps the water edge smooth without a huge grid. */
 export function createLandscapeGeometry(){
  // Keep fine angular samples around the cabin; the distant shore needs half as many.
- const angles=[];for(let i=0;i<=640;i++){const a=i/640*Math.PI*2;if(i%2===0||a<.9||a>Math.PI*2-.9)angles.push(a);}
+ const angularSteps=1920,angles=[];for(let i=0;i<=angularSteps;i++){const a=i/angularSteps*Math.PI*2,wrapped=Math.atan2(Math.sin(a),Math.cos(a));if(i%6===0||(wrapped>-.8&&wrapped<.16))angles.push(a);}
  const segments=angles.length-1,positions=[],uvs=[],colors=[],indices=[];
- const sections=[];
- for(const r of [0,.88,.94,.97,.985,1,1.015,1.035])sections.push({kind:'lake',r});
+ const sections=[],shoreOuter=1+3.99/LAKE.rz;
+ for(const r of [0,.88,.94,1-3.42/LAKE.rz,1-1.71/LAKE.rz,1,1+1.71/LAKE.rz,shoreOuter])sections.push({kind:'lake',r});
  // Resolve the carved driveway and parking apron rather than bridging them with long triangles.
- for(let i=1;i<=48;i++)sections.push({kind:'inland',t:i/48});
+ for(let i=1;i<=96;i++)sections.push({kind:'inland',t:i/96});
  for(const offset of [-5.2,-4.2,0,4.2,5.2,6.5])sections.push({kind:'road',offset});
  for(const r of [1.075,1.12,1.17,1.24,1.34,1.48,1.65,1.85,2.1,2.45,2.9,3.5])sections.push({kind:'outer',r});
  const c=new THREE.Color();
@@ -31,15 +33,15 @@ export function createLandscapeGeometry(){
    const a=angles[i],sa=Math.sin(a),ca=Math.cos(a),route=roadPoint(a),roadR=Math.hypot(route.x,route.z-WORLD.centerZ);
    let x,z;
    if(section.kind==='lake'){x=LAKE.rx*section.r*sa;z=LAKE.z-LAKE.rz*section.r*ca;}
-   else if(section.kind==='inland'){x=THREE.MathUtils.lerp(LAKE.rx*1.035,roadR-6,section.t)*sa;z=THREE.MathUtils.lerp(LAKE.z-LAKE.rz*1.035*ca,WORLD.centerZ-(roadR-6)*ca,section.t);}
+   else if(section.kind==='inland'){x=THREE.MathUtils.lerp(LAKE.rx*shoreOuter,roadR-6,section.t)*sa;z=THREE.MathUtils.lerp(LAKE.z-LAKE.rz*shoreOuter*ca,WORLD.centerZ-(roadR-6)*ca,section.t);}
    else {const r=section.kind==='road'?roadR+section.offset:roadR*section.r;x=r*sa;z=WORLD.centerZ-r*ca;}
    const y=landscapeHeight(x,z),lr=Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz);
    positions.push(x,y,z);uvs.push((x+650)/1300,(z-WORLD.centerZ+650)/1300);
-   c.set(lr<1.035?0xb8b196:y>66?0xc4c5c0:y>26?0x9ca393:0xffffff);colors.push(c.r,c.g,c.b);
+   c.set(lr<shoreOuter?0xb8b196:y>66?0xc4c5c0:y>26?0x9ca393:0xffffff);colors.push(c.r,c.g,c.b);
    if(row<sections.length-1&&i<segments){const n=row*(segments+1)+i;indices.push(n,n+1,n+segments+1,n+1,n+segments+2,n+segments+1);}
   }
  }
- const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();return g;
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();g.userData.gridColumns=segments+1;g.userData.gridRows=sections.length;return g;
 }
 
 export function createAsphaltMaps(){
@@ -61,9 +63,9 @@ export function createLakeDetails(){
  const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
  const transform=new THREE.Object3D(),color=new THREE.Color();
  const rockGeometry=createGraniteGeometry({detail:3});
- const rocks=new THREE.InstancedMesh(rockGeometry,createRockMaterial(),330);
- for(let i=0;i<330;i++){
-  const a=random()*Math.PI*2,r=.997+random()*.035,x=LAKE.rx*r*Math.sin(a),z=LAKE.z-LAKE.rz*r*Math.cos(a),s=.24+random()**2*1.8;
+ const rocks=new THREE.InstancedMesh(rockGeometry,createRockMaterial(),700);
+ for(let i=0;i<700;i++){
+  const a=random()*Math.PI*2,r=1+(-.34+random()*4)/LAKE.rz,x=LAKE.rx*r*Math.sin(a),z=LAKE.z-LAKE.rz*r*Math.cos(a),s=.24+random()**2*1.8;
   transform.position.set(x,Math.max(-.22,landscapeHeight(x,z))-.15,z);transform.rotation.set(random()*.5,random()*6.28,random()*.4);transform.scale.set(s*(1+random()*.7),s*.55,s*(.7+random()*.5));transform.updateMatrix();rocks.setMatrixAt(i,transform.matrix);
   color.setHSL(.11,.018+random()*.025,.80+random()*.16);rocks.setColorAt(i,color);
  }rocks.castShadow=rocks.receiveShadow=true;group.add(rocks);
@@ -78,9 +80,9 @@ export function createLakeDetails(){
   }
  }
  const blades=new THREE.BufferGeometry();blades.setAttribute('position',new THREE.Float32BufferAttribute(p,3));blades.setIndex(ix);blades.computeVertexNormals();
- const reeds=new THREE.InstancedMesh(blades,new THREE.MeshStandardMaterial({color:0x737e45,roughness:1,side:THREE.DoubleSide}),1800);
- for(let i=0;i<1800;i++){
-  const a=random()*Math.PI*2,r=1.032+random()*.018,x=LAKE.rx*r*Math.sin(a),z=LAKE.z-LAKE.rz*r*Math.cos(a),s=.4+random()*.9;
+ const reeds=new THREE.InstancedMesh(blades,new THREE.MeshStandardMaterial({color:0x737e45,roughness:1,side:THREE.DoubleSide}),3000);
+ for(let i=0;i<3000;i++){
+  const a=random()*Math.PI*2,r=1+(3.65+random()*2.05)/LAKE.rz,x=LAKE.rx*r*Math.sin(a),z=LAKE.z-LAKE.rz*r*Math.cos(a),s=.4+random()*.9;
   transform.position.set(x,landscapeHeight(x,z)-.04,z);transform.rotation.set(0,random()*6.28,0);transform.scale.set(s,s,s);transform.updateMatrix();reeds.setMatrixAt(i,transform.matrix);
   color.setHSL(.17+random()*.08,.17+random()*.2,.18+random()*.12);reeds.setColorAt(i,color);
  }reeds.receiveShadow=true;group.add(reeds);
@@ -112,56 +114,101 @@ export function createSandbar(){
  const sand=new THREE.Mesh(createSandbarGeometry(),material);sand.name='Rocky shore sandbar';sand.receiveShadow=true;return sand;
 }
 
-/** A continuous arched volume with an empty, open-ended interior. */
+/** Carved stone vault with a clear driving envelope and real lake-view apertures. */
 export function createMountainTunnel(){
  const group=new THREE.Group();group.name='North ridge traversable tunnel';
- const rings=32,arcSteps=24,inner=[],outer=[],uv=[],indices=[],portals=[];
- const cross=[{x:TUNNEL.innerHalfWidth,y:0}];
- for(let i=0;i<=arcSteps;i++){const a=i/arcSteps*Math.PI;cross.push({x:TUNNEL.innerHalfWidth*Math.cos(a),y:1.6+(TUNNEL.height-1.6)*Math.sin(a)});}
- cross.push({x:-TUNNEL.innerHalfWidth,y:0});
- const count=cross.length;
+ const rings=72,arcSteps=24,springHeight=3.8,sillHeight=.85,openingHeight=3.55;
+ const windows=[[12,20],[32,40],[52,60]],inner=[],outer=[],uv=[],indices=[],portals=[],reveals=[],feet=[];
+ // Vertical walls keep the full jeep/head/camera envelope clear. Only the vault
+ // above 3.8 m curves inward; surface relief never displaces this geometry.
+ const cross=[{x:TUNNEL.innerHalfWidth,y:-.35,outerY:-1.2},{x:TUNNEL.innerHalfWidth,y:sillHeight,outerY:-.3},{x:TUNNEL.innerHalfWidth,y:openingHeight,outerY:4.4}];
+ for(let i=0;i<=arcSteps;i++){
+  const a=i/arcSteps*Math.PI;
+  cross.push({x:TUNNEL.innerHalfWidth*Math.cos(a),y:springHeight+(TUNNEL.height-springHeight)*Math.sin(a),outerY:5+5.9*Math.sin(a)});
+ }
+ cross.push({x:-TUNNEL.innerHalfWidth,y:openingHeight,outerY:4.4},{x:-TUNNEL.innerHalfWidth,y:sillHeight,outerY:-.3},{x:-TUNNEL.innerHalfWidth,y:-.35,outerY:-1.2});
+ const count=cross.length,lakeBand=count-3,angleAt=j=>THREE.MathUtils.lerp(TUNNEL.startAngle,TUNNEL.endAngle,j/rings);
  for(let j=0;j<=rings;j++){
-  const a=THREE.MathUtils.lerp(TUNNEL.startAngle,TUNNEL.endAngle,j/rings),c=roadPoint(a),prev=roadPoint(a-.001),next=roadPoint(a+.001),heading=Math.atan2(next.x-prev.x,prev.z-next.z),side=new THREE.Vector3(Math.sin(a),0,-Math.cos(a));
+  const a=angleAt(j),c=roadPoint(a),sx=Math.sin(a),sz=-Math.cos(a);
   for(let i=0;i<count;i++){
-   const q=cross[i],height=q.y,outerX=q.x/TUNNEL.innerHalfWidth*TUNNEL.outerHalfWidth;
-   const outerY=height<.1?-.8:1.6+(height-1.6)*2.05+.6*Math.sin(i*2.8+j*.9);
-   inner.push(c.x+side.x*q.x,c.y+height,c.z+side.z*q.x);outer.push(c.x+side.x*outerX,c.y+outerY,c.z+side.z*outerX);uv.push(j*2/3,i*.4);
-   if(j<rings&&i<count-1){const n=j*count+i;indices.push(n,n+1,n+count,n+1,n+count+1,n+count);}
+   const q=cross[i],outerX=q.x/TUNNEL.innerHalfWidth*TUNNEL.outerHalfWidth;
+   inner.push(c.x+sx*q.x,c.y+q.y,c.z+sz*q.x);outer.push(c.x+sx*outerX,c.y+q.outerY,c.z+sz*outerX);uv.push(j*.85,i*.35);
+   // Remove both stone skins, rather than drawing a transparent window over a wall.
+   const aperture=i===lakeBand&&windows.some(([start,end])=>j>=start&&j<end);
+   if(j<rings&&i<count-1&&!aperture){const n=j*count+i;indices.push(n,n+1,n+count,n+1,n+count+1,n+count);}
   }
  }
- function shell(positions,material){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();const o=new THREE.Mesh(g,material);o.castShadow=o.receiveShadow=true;group.add(o);return o;}
- const rock=createRockMaterial();
- shell(inner,rock);shell(outer,rock);
- for(const j of [0,rings])for(let i=0;i<count-1;i++){
-  const a=(j*count+i)*3,b=a+3;
-  for(const p of [[inner,a],[inner,b],[outer,b],[inner,a],[outer,b],[outer,a]])portals.push(...p[0].slice(p[1],p[1]+3));
+ const rock=createRockMaterial({relief:.85}),carvedRock=createRockMaterial({color:0xf1f0e8,relief:.22});
+ function mesh(positions,material,name,index=null,textureUV=null){
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  if(textureUV)geometry.setAttribute('uv',new THREE.Float32BufferAttribute(textureUV,2));if(index)geometry.setIndex(index);
+  geometry.computeVertexNormals();geometry.computeBoundingBox();geometry.computeBoundingSphere();
+  const object=new THREE.Mesh(geometry,material);object.name=name;object.castShadow=object.receiveShadow=true;group.add(object);return object;
  }
- const capGeometry=new THREE.BufferGeometry();capGeometry.setAttribute('position',new THREE.Float32BufferAttribute(portals,3));capGeometry.computeVertexNormals();const caps=new THREE.Mesh(capGeometry,rock);caps.castShadow=caps.receiveShadow=true;group.add(caps);
- // Irregular rock shoulders join the shell into a ridge instead of a freestanding arch.
- const outcropGeometry=createGraniteGeometry();
- const outcrops=new THREE.InstancedMesh(outcropGeometry,createRockMaterial(),12),placement=new THREE.Object3D();
- for(let j=0;j<6;j++)for(let side of [-1,1]){
-  const a=THREE.MathUtils.lerp(TUNNEL.startAngle,TUNNEL.endAngle,j/5),c=roadPoint(a),distance=17+Math.sin(j*2.4)*1.2;
-  placement.position.set(c.x+Math.sin(a)*distance*side,c.y+1.7,c.z-Math.cos(a)*distance*side);placement.rotation.set(.12*Math.sin(j),-a,.1*side);placement.scale.set(9.8,8.8+Math.sin(j*1.7),12.5);placement.updateMatrix();outcrops.setMatrixAt(j*2+(side>0?1:0),placement.matrix);
- }outcrops.castShadow=outcrops.receiveShadow=true;group.add(outcrops);
+ mesh(inner,carvedRock,'Carved tunnel interior',indices,uv);mesh(outer,rock,'Continuous ridge exterior',indices,uv);
+ const vertex=(positions,j,i)=>positions.slice((j*count+i)*3,(j*count+i)*3+3);
+ const quad=(positions,a,b,c,d)=>positions.push(...a,...b,...c,...a,...c,...d);
+ for(const j of [0,rings])for(let i=0;i<count-1;i++)quad(portals,vertex(inner,j,i),vertex(inner,j,i+1),vertex(outer,j,i+1),vertex(outer,j,i));
+ mesh(portals,carvedRock,'Open tunnel portal stone');
+ for(const [start,end] of windows){
+  // Real 5.6 m-deep jambs plus splayed sill/header reveal the wall thickness.
+  // The exterior sill drops below road level, preserving the downhill lake view.
+  for(const j of [start,end])quad(reveals,vertex(inner,j,lakeBand),vertex(inner,j,lakeBand+1),vertex(outer,j,lakeBand+1),vertex(outer,j,lakeBand));
+  for(let j=start;j<end;j++)for(const i of [lakeBand,lakeBand+1])quad(reveals,vertex(inner,j,i),vertex(outer,j,i),vertex(outer,j+1,i),vertex(inner,j+1,i));
+ }
+ mesh(reveals,carvedRock,'Lake opening stone jambs sills and headers');
+ for(let j=0;j<rings;j++)for(const i of [0,count-1])quad(feet,vertex(inner,j,i),vertex(outer,j,i),vertex(outer,j+1,i),vertex(inner,j+1,i));
+ mesh(feet,rock,'Tunnel wall foundations');
+ // Shoulder rocks are decoration outside the entire vault, never part of its
+ // interior. Avoid pitch/roll and keep their full radial extent well clear.
+ const outcropGeometry=createGraniteGeometry(),outcrops=new THREE.InstancedMesh(outcropGeometry,rock,12),placement=new THREE.Object3D();
+ outcrops.name='Exterior ridge shoulders';
+ for(let j=0;j<6;j++)for(const side of [-1,1]){
+  const a=angleAt(j*rings/5),c=roadPoint(a),distance=27+Math.sin(j*2.4)*1.2;
+  const x=c.x+Math.sin(a)*distance*side,z=c.z-Math.cos(a)*distance*side;
+  // Low lake-side stone follows the descending terrain instead of forming a
+  // second opaque wall in front of the viewing apertures.
+  placement.position.set(x,side<0?landscapeHeight(x,z)+.15:c.y-20,z);placement.rotation.set(0,-a,0);
+  // Tall outward bedrock is buried into the ridge, not suspended above its slope.
+  placement.scale.set(side<0?10.5:12.5,side<0?1.6:28+Math.sin(j*1.7),side<0?4:9);
+  placement.updateMatrix();outcrops.setMatrixAt(j*2+(side>0?1:0),placement.matrix);
+ }
+ outcrops.castShadow=outcrops.receiveShadow=true;group.add(outcrops);
+ group.userData.tunnel={clearHalfWidth:TUNNEL.innerHalfWidth,verticalClearance:springHeight,roofHeight:TUNNEL.height,openings:windows.map(([start,end])=>({startAngle:angleAt(start),endAngle:angleAt(end),innerOffset:-TUNNEL.innerHalfWidth,outerOffset:-TUNNEL.outerHalfWidth,sillHeight,headHeight:openingHeight,outerSillHeight:-.3,outerHeadHeight:4.4}))};
  const lampMaterial=new THREE.MeshStandardMaterial({color:0xffecd0,emissive:0xffc88a,emissiveIntensity:2});
  for(let j=0;j<4;j++){
-  const c=roadPoint(THREE.MathUtils.lerp(TUNNEL.startAngle,TUNNEL.endAngle,(j+.5)/4));
-  const lamp=new THREE.Mesh(new THREE.BoxGeometry(.8,.08,.22),lampMaterial);lamp.position.set(c.x,c.y+TUNNEL.height-.15,c.z);group.add(lamp);
+  const a=THREE.MathUtils.lerp(TUNNEL.startAngle,TUNNEL.endAngle,(j+.5)/4),c=roadPoint(a);
+  const lamp=new THREE.Mesh(new THREE.BoxGeometry(.8,.08,.22),lampMaterial);lamp.name='Tunnel ceiling lamp';lamp.rotation.y=-a;lamp.position.set(c.x,c.y+TUNNEL.height-.15,c.z);group.add(lamp);
   const light=new THREE.PointLight(0xffe3ba,30,19,2);light.position.copy(lamp.position).add(new THREE.Vector3(0,-.2,0));group.add(light);
  }
  return group;
 }
-
 export function createParkingLot(){
  const group=new THREE.Group();group.name='Cabin side-road parking';
  const ground=new THREE.PlaneGeometry(20.5,14.5,14,10);ground.rotateX(-Math.PI/2);ground.translate(-16,0,-10);
  const p=ground.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,terrainHeight(p.getX(i),p.getZ(i))+.08);ground.computeVertexNormals();
- const gravel=new THREE.Mesh(ground,new THREE.MeshStandardMaterial({color:0x8c8f7d,roughness:1,bumpMap:createAsphaltMaps().bumpMap,bumpScale:.035}));gravel.receiveShadow=true;group.add(gravel);
+ const gravel=new THREE.Mesh(clipRibbonOutsideRoad(ground,DRIVEWAY,2.25),createGravelMaterial());ground.dispose();gravel.receiveShadow=true;group.add(gravel);
  const paint=new THREE.MeshStandardMaterial({color:0xdedbc4,roughness:1,transparent:true,opacity:.82});
  for(const bay of PARKING){
   for(const side of [-1,1]){const x=bay.x+side*bay.width/2,line=new THREE.Mesh(new THREE.BoxGeometry(.09,.025,bay.length),paint);line.position.set(x,terrainHeight(x,bay.z)+.11,bay.z);group.add(line);}
   const back=new THREE.Mesh(new THREE.BoxGeometry(bay.width,.025,.09),paint);back.position.set(bay.x,terrainHeight(bay.x,bay.z-bay.length/2)+.11,bay.z-bay.length/2);group.add(back);
  }
  return group;
+}
+
+/** Adaptive terrain tiles share vertex buffers and cull separately in every render pass. */
+export function createLandscapeTiles(source){
+ const columns=source.userData.gridColumns,rows=source.userData.gridRows;
+ if(!columns||!rows)throw new TypeError('Expected landscape grid geometry');
+ const bands=[0,7,103,109,115,rows-1].filter((v,i,a)=>v<rows&&(i===0||v>a[i-1])),tiles=[],point=new THREE.Vector3();
+ for(let col=0;col<columns-1;col+=64)for(let band=1;band<bands.length;band++){
+  const index=[],box=new THREE.Box3();
+  for(let row=bands[band-1];row<bands[band];row++)for(let c=col;c<Math.min(columns-1,col+64);c++){
+   const start=(row*(columns-1)+c)*6;
+   for(let k=0;k<6;k++){const vertex=source.index.getX(start+k);index.push(vertex);point.fromBufferAttribute(source.attributes.position,vertex);box.expandByPoint(point);}
+  }
+  if(!index.length)continue;
+  const g=new THREE.BufferGeometry();for(const [name,attribute] of Object.entries(source.attributes))g.setAttribute(name,attribute);g.setIndex(index);g.boundingBox=box;g.boundingSphere=box.getBoundingSphere(new THREE.Sphere());tiles.push(g);
+ }
+ return tiles;
 }

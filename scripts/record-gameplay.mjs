@@ -5,7 +5,7 @@
  */
 import {mkdir} from 'node:fs/promises';
 import path from 'node:path';
-import {WORLD,DRIVEWAY,HOME,DOCK,roadPoint} from '../engine.js';
+import {WORLD,DRIVEWAY,HOME,DOCK,LANDING_CORRIDOR,roadPoint} from '../engine.js';
 const {chromium}=await import('playwright').catch(()=>{throw new Error('Capture only: install Playwright with npm install --no-save playwright, then run this on a desktop with Chrome and WebGL 2.');});
 const out=path.resolve(process.env.OUTPUT||'artifacts/gameplay');await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:false});
@@ -21,16 +21,16 @@ const startAngle=Math.atan2(state.x,WORLD.centerZ-state.z),route=[];
 const endAngle=-.65+(process.env.FULL_LOOP==='1'?Math.PI*2:0);
 for(let a=startAngle+.025;a<endAngle;a+=.025)route.push(roadPoint(a));
 route.push(...DRIVEWAY.slice(0,-1),HOME);
-let waypoint=0;const deadline=Date.now()+(process.env.FULL_LOOP==='1'?300000:90000);
+let waypoint=0;const deadline=Date.now()+(process.env.FULL_LOOP==='1'?900000:240000);
 while(waypoint<route.length&&Date.now()<deadline){
  const result=await page.evaluate(p=>{const s=cabinQA.state;if(s.status!=='running')throw new Error('Capture lost focus and paused. Keep the browser active.');const d=Math.hypot(p.x-s.x,p.z-s.z),target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));cabinQA.input.clear();if(s.speed<7)cabinQA.input.add('up');if(error<-.035)cabinQA.input.add('left');if(error>.035)cabinQA.input.add('right');return d;},route[waypoint]);
  if(result<1.4)waypoint++;await page.waitForTimeout(50);
 }
 await page.evaluate(()=>cabinQA.input.clear());if(waypoint<route.length)throw new Error('Road sequence did not reach the cabin. Inspect recorded gameplay instead of claiming success.');
 await page.keyboard.press('Space');await page.screenshot({path:path.join(out,'02-jeep-at-cabin.png')});await page.waitForTimeout(1500);
-await page.keyboard.press('v');const flightDeadline=Date.now()+60000;
+await page.keyboard.press('v');await page.keyboard.press('Space');await page.waitForFunction(()=>cabinQA.state.enginePhase==='running');const flightDeadline=Date.now()+180000;
 while(Date.now()<flightDeadline){
- const ready=await page.evaluate(dock=>{const s=cabinQA.state,distance=Math.hypot(dock.x-s.x,dock.z-s.z),target=Math.atan2(dock.x-s.x,s.z-dock.z),error=Math.atan2(Math.sin(target-s.heading-s.yawRate*.6),Math.cos(target-s.heading-s.yawRate*.6));const throttle=distance<60?.32:.7,predicted=s.y+s.verticalSpeed*.8;cabinQA.input.clear();if(s.throttle<throttle-.01)cabinQA.input.add('boost');if(s.throttle>throttle+.01)cabinQA.input.add('brake');if(predicted<7.5)cabinQA.input.add('up');if(predicted>8.5)cabinQA.input.add('down');if(error<-.025)cabinQA.input.add('left');if(error>.025)cabinQA.input.add('right');return s.actionReady;},DOCK);
+ const ready=await page.evaluate(({dock,corridor})=>{const s=cabinQA.state,distance=Math.hypot(dock.x-s.x,dock.z-s.z),target=Math.atan2(dock.x-s.x,s.z-dock.z),error=Math.atan2(Math.sin(target-s.heading-s.yawRate*.6),Math.cos(target-s.heading-s.yawRate*.6));const landed=s.touchdownAge>=0,approaching=s.z<corridor.zStart,throttle=landed?(distance<25?.07:.22):approaching?.4:.7,predicted=s.y+s.verticalSpeed*.8;cabinQA.input.clear();if(s.throttle<throttle-.01)cabinQA.input.add('boost');if(s.throttle>throttle+.01)cabinQA.input.add('brake');if(!landed&&!approaching&&predicted<11.5)cabinQA.input.add('up');if(!landed&&(approaching||predicted>12.5))cabinQA.input.add('down');if(error<-.025)cabinQA.input.add('left');if(error>.025)cabinQA.input.add('right');return s.actionReady;},{dock:DOCK,corridor:LANDING_CORRIDOR});
  if(ready)break;await page.waitForTimeout(50);
 }
 await page.evaluate(()=>cabinQA.input.clear());await page.screenshot({path:path.join(out,'03-plane-approach.png')});await page.keyboard.press('Space');

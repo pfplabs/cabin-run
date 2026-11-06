@@ -32,3 +32,31 @@ export function createPropellerBlur(){
  gl_FragColor=vec4(vec3(.14,.17,.18),amount*envelope*sweep*.27);}`});
  const mesh=new THREE.Mesh(new THREE.CircleGeometry(1.48,48),material);mesh.name='Propeller exposure blur';mesh.position.z=-.015;mesh.renderOrder=1;return mesh;
 }
+
+/** Real floating markers outline the approach, without a scripted landing path. */
+export function createLandingCorridor(corridor){
+ const group=new THREE.Group();group.name='Buoy marked water landing corridor';
+ const count=28,body=new THREE.InstancedMesh(new THREE.CylinderGeometry(.24,.38,.55,12),new THREE.MeshStandardMaterial({color:0xd7c572,roughness:.63}),count),stripe=new THREE.InstancedMesh(new THREE.CylinderGeometry(.245,.30,.16,12),new THREE.MeshStandardMaterial({color:0xf0f1e8,roughness:.6}),count),d=new THREE.Object3D();
+ for(let i=0;i<14;i++)for(const side of [-1,1]){
+  d.position.set(corridor.centerX+side*corridor.width/2,.17,corridor.zEnd+(corridor.zStart-corridor.zEnd)*i/13);d.updateMatrix();body.setMatrixAt(i*2+(side>0?1:0),d.matrix);
+  d.position.y=.30;d.updateMatrix();stripe.setMatrixAt(i*2+(side>0?1:0),d.matrix);
+ }
+ body.castShadow=body.receiveShadow=true;group.add(body,stripe);return group;
+}
+export class WaterWake extends THREE.Points{
+ constructor(){
+  const count=160,g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(count*3),3));g.setAttribute('aSize',new THREE.Float32BufferAttribute(new Float32Array(count),1));g.setAttribute('aAlpha',new THREE.Float32BufferAttribute(new Float32Array(count),1));
+  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,vertexShader:`attribute float aSize,aAlpha;varying float vAlpha;void main(){vAlpha=aAlpha;vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=min(55.,aSize*400./max(2.,-p.z));gl_Position=projectionMatrix*p;}`,fragmentShader:`varying float vAlpha;void main(){float r=length(gl_PointCoord-.5)*2.;gl_FragColor=vec4(.83,.94,.97,pow(max(0.,1.-r*r),2.)*vAlpha);}`});
+  super(g,m);this.name='Floatplane water wake and touchdown spray';this.frustumCulled=false;this.pool=Array.from({length:count},()=>({age:10,life:1}));this.next=0;this.emission=0;this.seed=43;this.lastTouchdown=-1;
+ }
+ random(){this.seed=(this.seed*1664525+1013904223)>>>0;return this.seed/4294967296;}
+ emitParticle(state,burst){const side=this.random()>.5?1:-1,p=this.pool[this.next];this.next=(this.next+1)%this.pool.length;Object.assign(p,{x:state.x+Math.cos(state.heading)*side*1.1-Math.sin(state.heading),z:state.z+Math.sin(state.heading)*side*1.1+Math.cos(state.heading),y:.08,vx:(this.random()-.5)*(burst?4:1)-Math.sin(state.heading)*state.speed*.1,vz:(this.random()-.5)*(burst?4:1)+Math.cos(state.heading)*state.speed*.1,vy:burst?1.3+this.random()*1.8:.15,age:0,life:burst?1.4:2.5,size:burst?.12:.3});}
+ update(state,dt){
+  dt=Math.max(0,Math.min(dt,.05));const active=state.phase==='plane'&&state.status==='running';
+  if(active&&state.touchdownAge>=0&&(this.lastTouchdown<0||state.touchdownAge<this.lastTouchdown))for(let i=0;i<48;i++)this.emitParticle(state,true);
+  this.lastTouchdown=state.phase==='plane'?state.touchdownAge:-1;
+  if(active&&state.onWater&&!state.parked&&state.speed>1){this.emission+=state.speed*3*dt;while(this.emission>=1){this.emission--;this.emitParticle(state,false);}}
+  for(let i=0;i<this.pool.length;i++){const p=this.pool[i];p.age+=dt;if(p.age>=p.life){this.geometry.attributes.aAlpha.setX(i,0);continue;}p.x+=p.vx*dt;p.z+=p.vz*dt;p.y=Math.max(.035,p.y+p.vy*dt);p.vy-=5*dt;this.geometry.attributes.position.setXYZ(i,p.x,p.y,p.z);this.geometry.attributes.aSize.setX(i,p.size+p.age*.35);this.geometry.attributes.aAlpha.setX(i,.46*(1-p.age/p.life));}
+  for(const a of Object.values(this.geometry.attributes))a.needsUpdate=true;
+ }
+}

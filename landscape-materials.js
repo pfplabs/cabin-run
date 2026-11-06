@@ -95,7 +95,8 @@ function patch(material,{terrain=false,grassMap=null,lake={x:0,z:124,rx:156,rz:1
     float lmSlope=1.-abs(normalize(vLMWorldNormal).y);
     float lmRockMask=smoothstep(.12,.46,lmSlope+(lmLarge.r-.5)*.14);
     float lmLakeRadius=length((vLMWorld.xz-lmLake.xy)/lmLake.zw);
-    float lmShore=(1.-smoothstep(1.018,1.065,lmLakeRadius))*
+    float lmShoreDistance=(lmLakeRadius-1.)*min(lmLake.z,lmLake.w);
+    float lmShore=(1.-smoothstep(2.05,7.4,lmShoreDistance))*
       (1.-smoothstep(1.5,4.,vLMWorld.y));
     float lmSoil=smoothstep(.57,.78,lmLarge.r)*.28*(1.-lmRockMask);
     vec3 lmSoilColour=vec3(.25,.22,.165)*(1.+(lmFine.g-.5)*.1*lmDetail);

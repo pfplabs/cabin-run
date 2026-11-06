@@ -1,67 +1,66 @@
-# Northbound — Cabin Run 3D
+# Northbound · Cabin Run 3D
 
-A real-time Three.js alpine-lake driving and floatplane sandbox, reconstructed from the supplied cabin artwork. The cabin, dock, canoe, jeep, yellow floatplane and Icelandic flag are actual Blender meshes. No original model files were required. The rebuilt cabin now has a larger, approximately 493 m² footprint, with human-scaled doors/stairs, a full-width balcony, wraparound living-room glazing and a furnished interior.
+A real-time Three.js alpine-lake driving and floatplane sandbox, rebuilt from the supplied cabin artwork. Cabin, dock, jeep, floatplane and moving aircraft controls are actual Blender meshes. The supplied reference images are not redistributed.
 
-This branch replaces the old 2D prototype at the root. The original prototype is preserved under `legacy-2d/`; `main` is unchanged. Nothing has been deployed.
+Work stays on `feat/3d-alpine-lake`. `main` is unchanged, the old prototype is preserved in `legacy-2d/`, and nothing has been deployed.
 
-## Run locally
+## Play locally
 
-Use a current browser with WebGL 2 and hardware acceleration. No package install or build is required for playing; Three.js and its MIT license are vendored locally.
+Use a current browser with WebGL 2 and hardware acceleration. All runtime assets and Three.js are local; no package installation or build is needed to play.
 
-```
-python3 -m http.server 4173
+```sh
+python 3 -m http.server 4173
 # Open http://localhost:4173
 ```
 
-`npm start` runs the same server. Do not open `index.html` through `file://` because the browser needs HTTP to load modules and the glTF model.
+`npm start` runs the same server. Do not open the page through `file://`.
 
-## Explore
+## Controls
 
-- Jeep: W/S or arrows for throttle and reverse, A/D or arrows to steer, Shift for the higher speed range, Control to brake. Normal speed reaches 79 km/h, or 101 km/h with Shift. Steering, grip, acceleration and suspension are smoothed; slow for corners.
-- Floatplane starts idling on the water. Hold Shift to raise throttle, then W to lift off once moving. Control lowers throttle; release holds the chosen power. A/D banks and steers, W/S changes pitch smoothly. The HUD shows throttle, airspeed and engine RPM.
-- V switches between the jeep road start and floatplane lake start. This is a convenient scene selector, not an in-world boarding interaction.
-- Space parks near the house, moors the plane near the dock below 47 km/h, or releases it from its mooring. After release, throttle up and lift off again.
-- C cycles close orbit, wide orbit and fixed cabin cameras. Drag to orbit either vehicle, scroll to zoom, or use one-finger orbit and two-finger pinch on touch screens. The close camera smoothly follows steering while preserving your relative orbit angle. Wide orbit stays world-relative. Horizontal/diagonal two-finger trackpad swipes rotate, pinch zooms, and Shift+scroll is an explicit orbit fallback. The camera ducks and moves closer inside the tunnel, then restores your chosen distance.
-- P or Escape pauses. Losing focus pauses the simulation and clears held controls.
-- On-screen multi-touch driving/flight controls are provided for small/coarse-pointer screens.
-- Sound is opt-in. No accounts, analytics, tracking, remote assets or gameplay network calls. Texture credits are linked in the scene and documented in `assets/pbr/SOURCES.md`.
+- Jeep: W/S or arrows accelerate/reverse; A/D steer; Control brakes. Normal top speed is 79 km/h, or 101 km/h with Shift. Steering, lateral grip and four-wheel suspension are smoothed. Slow for corners.
+- Plane: press Space to start the engine and wait three seconds. Hold Shift to increase throttle, then W to lift off above 36 km/h. Releasing Shift holds power. W/S changes pitch; A/D banks and steers. The actual ailerons, elevators and rudder move.
+- Plane Control: reduces power in the air. On the water it also brakes the taxi motion. The HUD distinguishes these functions and shows throttle, airspeed and RPM.
+- Landing: approach the cabin between the two buoy lines, reduce power and descend. Touchdown is physical water contact with flare/settling and spray, not a teleport. Taxi slowly to the extended pier; Space moors within 10 m at under 11 km/h. Space releases the mooring, then another Space starts the engine.
+- V switches vehicle starting points. This remains a quick scene selector, not an on-foot boarding sequence.
+- C cycles heading-follow orbit, world-relative wide orbit and a fixed cabin view. Drag to orbit, scroll/pinch to zoom. Horizontal or diagonal trackpad swipes orbit; Shift+scroll is an explicit fallback. The camera ducks inside the tunnel and restores preferred zoom outside.
+- P/Escape pauses. Losing focus pauses and clears held controls. Touch driving buttons, one-finger orbit and two-finger pinch are supported.
+- Sound is opt-in. No accounts, analytics, tracking or gameplay network calls.
 
-The expanded lake has four times the original surface area (312 × 228 metres across). A winding, roughly 1.2 km road climbs the rocky ridge, passes through a genuine open-ended tunnel, and descends around the lake. The asphalt is 8.4 m wide, with contrasting textured gravel shoulders that produce tyre dust. A densely sampled gravel driveway follows the ground to three usable parking bays beside the enlarged timber cabin. A sandy bar and reeds soften the rocky shoreline. The world is bounded by the valley; flight has an 84 m altitude ceiling. A translucent edge appears near the flight limit. Leaving it shows an eight-second return countdown; manual return is allowed before a gentle steering assist engages. There are no crates, rings, races or imposed objectives.
+## The valley
 
-## Rebuild the Blender assets
+The lake is 936 ×684 m, nine times the preceding lake's area and 36 times the first 3D version's area. Cabin, vehicles, human doors, dock and parking retain real-world scale. The approximately 3.63 km road climbs a 70 m ridge, passes through a clean carved tunnel with three real lake-view openings, then descends around the lake.
 
-Requires Blender 4.3 or later:
+Asphalt is 8.4 m wide. The cabin approach uses the same paving, clipped at the junction to avoid stacked surfaces. Distinct textured gravel shoulders and parking produce speed-dependent tyre dust. The driveway has metre-spaced geometry and is checked against the actual land mesh. Three parking bays serve the enlarged timber cabin, with its balcony, wraparound glazing and furnished interior.
 
-```
-blender --background --threads 4 --python scripts/build_scene.py
-```
+The pier extends toZ 36 with a verified floatplane berth. Float clearance, wing clearance and water immersion have been checked against the exported model. Taxi collision prevents passing through the pier.
 
-Outputs `assets/northbound.blend`, `assets/northbound.glb` and a Blender preview. The procedural Blender source retains all dimensions and object labels; the exported scene batches static meshes by material for runtime efficiency. Runtime creates the bounded surrounding terrain, roadway, vegetation, sky and reflective animated lake.
+A translucent flight edge and eight-second return countdown permit manual recovery before gentle steering assistance. The flight ceiling is 140 m. There are no rings, crates, races or imposed objectives.
 
-## Checks
+## Visuals and performance
 
-```
+The photographed skyline has been removed. A building-free procedural sky and actual mountain terrain form the horizon. Sun, sky, fog, water highlights and indirect reflections follow one smooth ten-minute daylight/golden-hour cycle. The sun never falls below 11 degrees and the scene never enters night.
+
+Terrain mixes grass, soil, wet/dry shoreline and granite detail. Adaptive terrain density and separately culled tiles keep detail where it matters. The 9,500 seeded trees use spatial chunks, detailed-to-card transitions at 160–220 m, mipmaps, atmospheric perspective and long-distance fade/culling. Reflections and shadows retain their own frustum culling.
+
+This is an evolving playable reconstruction, not a claim of photorealistic parity with the reference. The latest shaders, visual composition, mobile behavior and actual FPS still require a fresh browser pass. See `QA.md`.
+
+## Rebuild and verify
+
+```sh
 npm install
 npm test
 node scripts/inspect-scene.mjs
+blender --background --threads 4 --python scripts/build_scene.py
 ```
 
-The 55 Node tests cover driving, flight, boundaries, collision, pause/resume/restart, vehicle switching, a complete winding road circuit through the tunnel, continuous input-driven trips to the cabin and dock, camera gestures, terrain mesh normals and tunnel geometry. Scene validation parses the real GLB with Three.js, checks named vehicle roots, finite geometry and triangle/draw-call budgets.
+Blender 4.3+ recreates the editable `.blend` and `.glb`. Tests cover input-driven trips, startup/takeoff/landing, lane following at speed, frame-rate consistency, camera gestures, tunnel clearance/windows, actual road/land alignment, LOD, lighting and particles.
 
-`?qa=1` enables `window.cabinQA` for deterministic test setup. `window.cabinDiagnostics()` is read-only and reports scene/renderer/simulation details. Normal play does not expose state-changing debug controls.
+`?qa=1` enables `window.cabinQA`. `window.cabinDiagnostics()` reports recent real browser frame intervals, renderer counts and forest/terrain statistics. CPU submission estimates are not measured FPS.
 
-## Art and verification status
+Three.js 0.183.2 is MIT-licensed, see `vendor/THREE-LICENSE`. Texture attribution is in `assets/pbr/SOURCES.md` and linked from the game.
 
-This is an evolving 3D reconstruction, not a claim of photorealistic parity with the modern reference rendering. Modeling, textured materials, lighting and vegetation remain iterative. `assets/northbound.blend` is the editable source, not a gameplay capture. The browser scene adds live reflections, photographed HDR sky/lighting, PBR timber maps, photographic grass, textured 3D needle branches, physical glass, clearcoat paint and procedural mineral detail. Terrain now layers grass, soil, shoreline and exposed rock; granite uses metre-scale weathering, mineral detail, roughness and surface-normal variation. These procedural materials and smoother decorative boulders remain an art iteration, not photorealistic parity.
+## Later milestones
 
-The previous iteration was rendered and driven in a real Mac browser, including jeep and aircraft controls, pause, switching and boundary recovery. The expanded world was played by the user. The latest camera corrections, new flight dynamics and material shaders pass automated checks, but their integrated appearance, touch behavior and frame rate still need a fresh browser pass. The cloud browser disables WebGL, so it cannot supply that verification. See `QA.md`. Never describe a Blender preview as captured gameplay.
+Cockpit views for jeep and plane follow the visual work. The final gameplay trailers and retrospective article are deferred until the user is satisfied.
 
-## Third-party software
-
-Three.js 0.183.2, MIT. See `vendor/THREE-LICENSE`. Scene geometry and procedural textures were newly created for this project; supplied reference images are not redistributed in this public repository.
-
-## Genuine gameplay recording
-
-The final trailer is deferred until the user is satisfied with the game. The following helper is preparation only, not a completed or verified recording.
-
-On a WebGL-capable desktop with Chrome, install Playwright separately (`npm install --no-save playwright`), start the static server, and run `node scripts/record-gameplay.mjs`. It records actual browser frames while scripted controls follow the road and fly to the dock. This capture helper has not yet been run in the GPU-disabled cloud. It saves unedited WebM and screenshots under `artifacts/gameplay/`. No Blender render or generated frame is substituted for gameplay.
+For later genuine browser capture, install Playwright separately, start the static server and run `node scripts/record-gameplay.mjs` on a WebGL-capable desktop. It records actual frames driven by scripted controls and saves unedited WebM/screenshots. This helper has not been GPU-verified in the cloud. No Blender or generated frame is substituted for gameplay.
