@@ -4,6 +4,20 @@ A real-time Three.js alpine-lake driving and floatplane sandbox, rebuilt from th
 
 Work stays on `feat/3d-alpine-lake`. `main` is unchanged, the old prototype is preserved in `legacy-2d/`, and nothing has been deployed.
 
+
+## Gameplay gallery
+
+Actual browser gameplay stills captured on November 6, 2026. These show the work-in-progress 3D build, not reference artwork or offline Blender renders.
+
+![Pickup driving along the forested lake road](docs/images/cabin-drive-18.jpg)
+
+*Pickup driving along the forested lake road.*
+
+![Floatplane cockpit above the alpine lake](docs/images/cabin-flight-36.jpg)
+
+*Floatplane cockpit above the alpine lake.*
+
+
 ## Play locally
 
 Use a current browser with WebGL 2 and hardware acceleration. All runtime assets and Three.js are local; no package installation or build is needed to play.
