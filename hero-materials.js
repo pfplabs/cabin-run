@@ -3,32 +3,47 @@ import * as THREE from 'three';
 // Material detail is evaluated in metres, so grain does not grow with a facade.
 // Only existing hero geometry is changed: collision and animation roots survive.
 function cedarFinish(material) {
+  // The shared hardwood photograph contains dark flooring-sized patches. On
+  // facade timbers those overwhelmed the real board joints and looked painted.
+  // Use a restrained cedar albedo with grain in metres instead; no new textures
+  // or draw calls, and no repeating floorboard photograph across the walls.
+  material.map=null;material.bumpMap=null;material.roughnessMap=null;
   material.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vTimberWorld;')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvTimberWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>', `#include <common>
       varying vec3 vTimberWorld;
       float timberHash(float n){return fract(sin(n*127.1)*43758.5453);}
+      float timberNoise(vec2 p){
+        vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        float n=i.x+i.y*57.0;
+        return mix(mix(timberHash(n),timberHash(n+1.0),f.x),
+                   mix(timberHash(n+57.0),timberHash(n+58.0),f.x),f.y);
+      }
     `).replace('#include <color_fragment>', `#include <color_fragment>
       vec3 p=vTimberWorld;
       float coursePosition=(p.y-1.675)/.33;
       float course=floor(coursePosition);
       float board=timberHash(course);
-      // Grain follows the long axis on each elevation, including side walls.
       vec3 face=abs(cross(dFdx(p),dFdy(p)));
       float along=face.x>face.z?p.z:p.x;
-      float knot=sin(along*.61+course*2.7)*.024+sin(along*2.1+course)*.006;
-      float frequency=118.0;
-      float footprint=fwidth(p.y)*frequency;
-      float grain=sin((p.y+knot)*frequency+sin(along*1.7)*.8);
-      grain*=1.0-smoothstep(.25,2.0,footprint);
+      // Low-frequency bending follows the length of each timber, rather than
+      // painting broad mottling or a uniform sine stripe over the whole house.
+      float bend=timberNoise(vec2(along*.38,course*2.3))*.045;
+      float grainCoordinate=p.y+bend;
+      float fine=timberNoise(vec2(along*.8+board*13.0,grainCoordinate*170.0));
+      float broad=timberNoise(vec2(along*.22+board*7.0,grainCoordinate*36.0));
+      float grainVisibility=1.0-smoothstep(.3,1.5,fwidth(grainCoordinate)*170.0);
+      float cedarGrain=(fine-.5)*grainVisibility;
       float jointDistance=min(fract(coursePosition),1.0-fract(coursePosition));
-      float joint=1.0-.12*(1.0-smoothstep(.01,.065,jointDistance));
-      // Narrow sheltered seams add depth without painting black stripes.
-      diffuseColor.rgb*=mix(.84,1.08,board)*(1.0+grain*.055)*joint;
+      float seamWidth=max(.028,fwidth(coursePosition));
+      float joint=1.0-.20*(1.0-smoothstep(0.0,seamWidth,jointDistance));
+      diffuseColor.rgb*=mix(.91,1.07,board)*(1.0+cedarGrain*.16+(broad-.5)*.07)*joint;
+    `).replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+      roughnessFactor=clamp(roughnessFactor+cedarGrain*.10,.65,.88);
     `);
   };
-  material.customProgramCacheKey=()=> 'cedar-grain-v1';
+  material.customProgramCacheKey=()=> 'cedar-grain-v2';
   material.needsUpdate=true;
 }
 
@@ -62,8 +77,9 @@ export function applyHeroMaterials(root) {
           m.clearcoat=.92;m.clearcoatRoughness=.12;m.envMapIntensity=1.15;
         }
         if(kind==='timber'){
-          m.color.set(/Fresh/i.test(name)?0xd3ad7e:0xbe976d);
-          m.roughness=.77;m.bumpScale=.018;cedarFinish(m);
+          m.color.set(/Fresh/i.test(name)?0xd3ad7e:0xc49d73);
+          m.roughness=.77;m.bumpScale=.018;
+          if(/Honey cedar/i.test(name))cedarFinish(m);
         }
         if(kind==='roof'){
           m.color.set(0x34413f);m.roughness=.52;m.metalness=.62;

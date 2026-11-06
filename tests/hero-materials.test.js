@@ -31,3 +31,15 @@ test('cabin practicals stay modest and create no extra shadow maps',()=>{
  assert.equal(lights.children.length,3);
  for(const light of lights.children){assert.equal(light.castShadow,false);assert.equal(light.decay,2);assert.ok(light.intensity<=48);}
 });
+test('wall cedar removes floor-sized mottling while preserving post and deck textures',()=>{
+ const root=new THREE.Group(),wall=mesh('Honey cedar',root),post=mesh('Fresh cedar edges',root),deck=mesh('Weathered deck',root);
+ const texture=new THREE.Texture();
+ for(const o of [wall,post,deck]){o.material.map=texture;o.material.bumpMap=texture;o.material.roughnessMap=texture;}
+ applyHeroMaterials(root);
+ assert.equal(wall.material.map,null);assert.equal(wall.material.bumpMap,null);assert.equal(wall.material.roughnessMap,null);
+ assert.equal(post.material.map,texture);assert.equal(deck.material.map,texture);
+ const shader={vertexShader:'#include <common>\n#include <worldpos_vertex>',fragmentShader:'#include <common>\n#include <color_fragment>\n#include <roughnessmap_fragment>'};
+ wall.material.onBeforeCompile(shader);
+ assert.match(shader.fragmentShader,/timberNoise/);assert.match(shader.fragmentShader,/roughnessFactor=clamp/);
+ assert.match(shader.fragmentShader,/fwidth\(coursePosition\)/);assert.equal(wall.material.customProgramCacheKey(),'cedar-grain-v2');
+});
