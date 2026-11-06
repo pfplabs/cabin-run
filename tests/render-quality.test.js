@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {createRenderQuality,isSettingsInput} from '../render-quality.js';
+import {createRenderQuality,isSettingsInput,isPauseShortcut} from '../render-quality.js';
 import {createFrameMetrics} from '../frame-metrics.js';
 const texture=()=>({isTexture:true});
 function setup(materials){const renderer={ratio:1,setPixelRatio(v){this.ratio=v;},getPixelRatio(){return this.ratio;},shadowMap:{enabled:true}};const scene={traverse(fn){materials.forEach(material=>fn({material}));}};return {renderer,scene};}
@@ -23,4 +23,14 @@ test('settings input classification excludes gameplay hotkeys in editable contro
 test('full frame metrics retain nested passes, CPU timing, slow active frames and reject resume gaps',()=>{
  let clock=0;const info={autoReset:true,render:{calls:0,triangles:0},reset(){this.render.calls=0;this.render.triangles=0;}};
  const m=createFrameMetrics({info},{now:()=>clock,capacity:2});assert.equal(info.autoReset,false);let dt=m.begin(0);clock=2;m.end(dt);dt=m.begin(16);info.render.calls+=5;info.render.calls+=3;clock=5;m.end(dt);assert.equal(m.snapshot().averageCalls,8);assert.equal(m.snapshot().averageSubmissionMs,3);assert.equal(m.snapshot().estimatedFPS,62.5);assert.equal(m.snapshot().gpuTimeMs,null);dt=m.begin(5000);m.end(dt);assert.equal(m.snapshot().sampleCount,1);dt=m.begin(5200);m.end(dt);assert.equal(m.snapshot().sampleCount,2);m.reset();assert.equal(m.snapshot().sampleCount,0);m.dispose();assert.equal(info.autoReset,true);
+});
+
+test('P pauses from settings without stealing text entry, native Escape or modified shortcuts',()=>{
+ const select={closest:s=>s.startsWith('textarea')?null:{}};
+ for(const key of ['p','P'])assert.equal(isPauseShortcut({key,target:select}),true);
+ assert.equal(isPauseShortcut({key:'Escape',target:select}),false);
+ assert.equal(isPauseShortcut({key:'Escape',target:{closest:()=>null}}),true);
+ for(const flag of ['repeat','isComposing','defaultPrevented','ctrlKey','metaKey','altKey'])assert.equal(isPauseShortcut({key:'p',target:select,[flag]:true}),false);
+ assert.equal(isPauseShortcut({key:'p',target:{closest:()=>({})}}),false);
+ for(const key of ['w','ArrowUp',' ','c','v'])assert.equal(isPauseShortcut({key,target:select}),false);
 });

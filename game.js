@@ -1,7 +1,7 @@
 import {EngineExhaust} from './engine-exhaust.js';
 import * as THREE from 'three';
 import {createFrameMetrics} from './frame-metrics.js';
-import {createRenderQuality,isSettingsInput} from './render-quality.js';
+import {createRenderQuality,isSettingsInput,isPauseShortcut} from './render-quality.js?v=pause-focus-1';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {CockpitCamera} from './cockpit-camera.js?v=pickup-glass-1';
 import {CameraRig} from './camera-rig.js';
@@ -151,7 +151,7 @@ function sync(){
 $('#start').addEventListener('click',()=>state.status==='paused'?pause():start());$('#restart').addEventListener('click',start);$('#pause').addEventListener('click',pause);$('#drive').addEventListener('click',()=>switchVehicle('jeep'));$('#fly').addEventListener('click',()=>switchVehicle('plane'));$('#camera').addEventListener('click',changeCamera);$('#interact').addEventListener('click',()=>{E.action(state);canvas.focus();sync();});$('#touch-action').addEventListener('click',()=>{E.action(state);canvas.focus();sync();});
 $('#sound').addEventListener('click',()=>{sound=!sound;$('#sound').textContent=sound?'Sound on':'Sound off';$('#sound').setAttribute('aria-pressed',String(sound));if(sound&&!audioCtx){audioCtx=new AudioContext();osc=audioCtx.createOscillator();gain=audioCtx.createGain();osc.type='triangle';osc.connect(gain);gain.connect(audioCtx.destination);gain.gain.value=0;osc.start();}if(audioCtx)audioCtx.resume();});
 const aliases={w:'up',ArrowUp:'up',s:'down',ArrowDown:'down',a:'left',ArrowLeft:'left',d:'right',ArrowRight:'right',Shift:'boost',Control:'brake',b:'reverse'};
-window.addEventListener('keydown',e=>{if(isSettingsInput(e.target))return;const key=aliases[e.key]||aliases[e.key.toLowerCase()];if(key){e.preventDefault();keys.add(key);}if(!e.repeat){if(['p','P','Escape'].includes(e.key))pause();if(['v','V'].includes(e.key))switchVehicle();if(['c','C'].includes(e.key))changeCamera();if(e.key===' '){e.preventDefault();E.action(state);}}});window.addEventListener('keyup',e=>keys.delete(aliases[e.key]||aliases[e.key.toLowerCase()]));
+window.addEventListener('keydown',e=>{if(isPauseShortcut(e)){e.preventDefault();pause();return;}if(isSettingsInput(e.target))return;const key=aliases[e.key]||aliases[e.key.toLowerCase()];if(key){e.preventDefault();keys.add(key);}if(!e.repeat){if(['v','V'].includes(e.key))switchVehicle();if(['c','C'].includes(e.key))changeCamera();if(e.key===' '){e.preventDefault();E.action(state);}}});window.addEventListener('keyup',e=>keys.delete(aliases[e.key]||aliases[e.key.toLowerCase()]));
 window.addEventListener('blur',()=>{clearInput();if(state.status==='running')pause();});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInput();if(state.status==='running')pause();}});
 document.querySelectorAll('[data-control]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);held.set(e.pointerId,b.dataset.control);b.classList.add('pressed');});const end=e=>{held.delete(e.pointerId);b.classList.remove('pressed');};for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,end);});
 window.addEventListener('pagehide',()=>{cameraRig.dispose();engineExhaust.dispose();environmentTarget?.dispose();pmrem.dispose();},{once:true});

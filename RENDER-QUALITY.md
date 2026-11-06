@@ -23,7 +23,9 @@ this is **not a texture-memory or download reduction**. Async refined GLTF
 materials are registered after vehicle/hero refinements.
 
 Keyboard events from settings and other form controls cannot steer, switch
-vehicles/cameras, start the engine or toggle pause. Focusing settings also clears
+vehicles/cameras or start the engine. P remains available to pause/resume from
+settings; text-entry fields and modified shortcuts retain their native behavior.
+Escape remains local to settings controls. Focusing settings also clears
 held driving input. Resize reapplies the selected pixel cap.
 
 ## Measurements
@@ -100,3 +102,12 @@ were captured. No shader/context errors were reported. Mac mini swap usage was
 0 and memory pressure reported 90% free at inspection; no GPU utilization was
 inferred. Expanding quality controls temporarily hides the minimap to keep
 the controls unobstructed.
+
+## Pause focus regression
+
+P/P-uppercase is handled before the settings driving-input guard, once per
+key press. It prevents select typeahead from changing the preset while pausing.
+Text entry, composition, modified shortcuts and consumed events are excluded;
+Escape is retained by focused controls. Chrome verified P pause/resume from the
+quality selector and P pause from the texture checkbox, while W stayed inert.
+154 tests pass. Screenshot: task-3/evidence/settings-pause-fixed.jpg.

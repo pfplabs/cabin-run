@@ -6,6 +6,14 @@ export const QUALITY_PRESETS=Object.freeze({
 });
 const MAP_SLOTS=['map','normalMap','bumpMap','roughnessMap','metalnessMap','aoMap','clearcoatMap','clearcoatNormalMap','clearcoatRoughnessMap'];
 export function isSettingsInput(target){return !!target?.closest?.('input,select,textarea,button,[contenteditable="true"],[data-render-settings]');}
+/** Pause remains available from settings; text entry and native Escape stay local. */
+export function isPauseShortcut(event){
+ if(event.repeat||event.isComposing||event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey)return false;
+ const target=event.target;
+ const editable=target?.closest?.('textarea,[contenteditable]:not([contenteditable="false"]),input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"])');
+ if(editable)return false;
+ return event.key==='p'||event.key==='P'||(event.key==='Escape'&&!isSettingsInput(target));
+}
 export function createRenderQuality({renderer,scene,defaultPreset='balanced',devicePixelRatio=()=>globalThis.devicePixelRatio||1,onChange=()=>{}}){
  if(!QUALITY_PRESETS[defaultPreset])throw new RangeError('Unknown quality preset');
  let preset=defaultPreset,texturesEnabled=true;const originals=new Map();
