@@ -31,6 +31,14 @@ test('cabin practicals stay modest and create no extra shadow maps',()=>{
  assert.equal(lights.children.length,3);
  for(const light of lights.children){assert.equal(light.castShadow,false);assert.equal(light.decay,2);assert.ok(light.intensity<=48);}
 });
+test('clear panes admit daylight while frames and mixed meshes retain shadows',()=>{
+ const root=new THREE.Group(),pane=mesh('Lake blue glazing',root),frame=mesh('Rubber and cabin trim',root),mixed=mesh('Lake blue glazing',root);
+ mixed.material=[mixed.material,new THREE.MeshStandardMaterial({name:'Window frame'})];
+ for(const o of [pane,frame,mixed])o.castShadow=true;
+ applyHeroMaterials(root);
+ assert.equal(pane.castShadow,false);assert.equal(frame.castShadow,true);assert.equal(mixed.castShadow,true);
+ assert.equal(pane.material.side,THREE.FrontSide);
+});
 test('wall cedar removes floor-sized mottling while preserving post and deck textures',()=>{
  const root=new THREE.Group(),wall=mesh('Honey cedar',root),post=mesh('Fresh cedar edges',root),deck=mesh('Weathered deck',root);
  const texture=new THREE.Texture();

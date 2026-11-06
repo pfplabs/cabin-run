@@ -67,9 +67,9 @@ export function applyHeroMaterials(root) {
         // Transmission uses opacity=1: combining both darkened the view through
         // the windows twice and hid the carefully modelled lounge and seats.
         m=new THREE.MeshPhysicalMaterial({name,color:vehicle?0xd0dfdf:0xe5efea,
-          roughness:vehicle?.075:.055,metalness:0,transmission:vehicle?.78:.92,
+          roughness:vehicle?.075:.025,metalness:0,transmission:vehicle?.78:.98,
           thickness:vehicle?.035:.045,ior:1.5,opacity:1,transparent:false,
-          envMapIntensity:1,side:THREE.DoubleSide});
+          envMapIntensity:1,side:vehicle?THREE.DoubleSide:THREE.FrontSide});
       }else{
         m=original.clone();
         if(kind==='paint'){
@@ -91,6 +91,9 @@ export function applyHeroMaterials(root) {
       stats[kind]++;cache.set(key,m);return m;
     });
     object.material=Array.isArray(object.material)?result:result[0];
+    // Standard shadow maps treat transmissive panes as opaque shutters. Let
+    // daylight reach the room; frames and mixed-material meshes still cast.
+    if(result.every(m=>/glazing/i.test(m.name)))object.castShadow=false;
   });
   // Low-power, inverse-square practicals illuminate the actual interior, rather
   // than making the entire window emissive. No additional shadow-map passes.

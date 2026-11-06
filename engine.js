@@ -93,7 +93,10 @@ export function mountainHeight(x,z){
  const back=1-smooth((d-500)/900);
  const massif=edge>0?(routeHeight(a)+210*ascent*flank)*edge*back:-Infinity;
  const portalBlend=smooth((a-(TUNNEL.startAngle-.06))/.06)*(1-smooth((a-TUNNEL.endAngle)/.06));
- const cover=(routeHeight(a)+10*smooth(d/5)+Math.max(0,d-5)*.8)*portalBlend*(1-smooth((d-35)/25));
+ // Uneven bedrock breaks the level crest without changing the flat cabin or
+ // paved corridor. Keep this in the shared height field for flight clearance.
+ const ridgeRelief=(3+1.7*Math.sin(a*31+d*.11)+1.1*Math.sin(a*67-d*.19))*smooth(d/12);
+ const cover=(routeHeight(a)+10*smooth(d/5)+Math.max(0,d-5)*.8+ridgeRelief)*portalBlend*(1-smooth((d-35)/25));
  return Math.max(massif,portalBlend>0?cover:-Infinity);
 }
 // Low distant foothills preserve the reference's open sky behind the cabin.

@@ -139,7 +139,12 @@ export function createMountainTunnel(){
   const a=angleAt(j),c=roadPoint(a),sx=Math.sin(a),sz=-Math.cos(a);
   for(let i=0;i<count;i++){
    const q=cross[i],outerX=q.x/TUNNEL.innerHalfWidth*TUNNEL.outerHalfWidth;
-   inner.push(c.x+sx*q.x,c.y+q.y,c.z+sz*q.x);outer.push(c.x+sx*outerX,Math.max(c.y+q.outerY,q.x>0&&i>=3&&i<=arcSteps+3?landscapeHeight(c.x+sx*outerX,c.z+sz*outerX):-Infinity),c.z+sz*outerX);uv.push(j*.85,i*.35);
+   // Break the extruded arch silhouette with broad weathered rock shoulders.
+   // Relief fades to zero at the walls, preserving the measured aperture edges
+   // and the full inner bore. Reuse these vertices for every closing face.
+   const crown=i>=3&&i<=arcSteps+3?Math.sin((i-3)/arcSteps*Math.PI)**2:0;
+   const relief=crown*(1.8+1.1*Math.sin(j*.31+i*.23)+.55*Math.sin(j*.83-i*.37));
+   inner.push(c.x+sx*q.x,c.y+q.y,c.z+sz*q.x);outer.push(c.x+sx*outerX,Math.max(c.y+q.outerY+relief,q.x>0&&i>=3&&i<=arcSteps+3?landscapeHeight(c.x+sx*outerX,c.z+sz*outerX):-Infinity),c.z+sz*outerX);uv.push(j*.85,i*.35);
    // Remove both stone skins, rather than drawing a transparent window over a wall.
    const aperture=i===lakeBand&&windows.some(([start,end])=>j>=start&&j<end);
    if(j<rings&&i<count-1&&!aperture){const n=j*count+i;indices.push(n,n+1,n+count,n+1,n+count+1,n+count);}

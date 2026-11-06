@@ -1,5 +1,13 @@
 # Verification record
 
+## Mac mini refinement check — 2026-11-06
+
+- Isolated checkout based on `8bf7e14`, served on `http://127.0.0.1:4183/?qa=1`.
+- 119 tests passed, including tunnel volume/camera clearance, watertight rock shells, three lake apertures, flat cabin terrain, and a new glass-only shadow regression. glTF inspection passed: 60 meshes, 143,234 triangles, 29 materials.
+- Chrome loaded the revised scene, started gameplay and switched cameras. No console errors were recorded. Existing `PCFSoftShadowMap` deprecation warning remains.
+- Ridge variation changes existing vertex heights only; no extra triangles, materials, lights or draw submissions. Cabin-only glass uses a clearer single-sided physical material; glass-only meshes no longer cast opaque shadow-map silhouettes. Mixed-material meshes retain shadows.
+- Actual browser screenshots were saved outside the repository in the task's `evidence` directory. Original reference attachments were not available in this checkout. This is a limited visual refinement, not a claim of photorealistic parity or measured FPS. The separate preview task owns performance measurement.
+
 ## Current automated checks
 
 - `npm test`: 83 tests passed against the integrated source.
