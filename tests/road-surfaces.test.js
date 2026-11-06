@@ -25,7 +25,7 @@ test('road normals face upward and gravel has distinct original detail',()=>{
  const material=createGravelMaterial();assert.ok(material.map.isDataTexture);assert.ok(material.bumpMap.isDataTexture);assert.ok(material.roughness>.9);
 });
 test('gravel classification distinguishes asphalt, shoulders and cabin driveway',()=>{
- const p=roadPoint(Math.PI/2);assert.equal(isGravel(p.x,p.z),false);assert.equal(isGravel(p.x+5,p.z),true);assert.equal(isGravel(-16,-9),false);assert.equal(isGravel(-23,-10),true);
+ const p=roadPoint(Math.PI/2);assert.equal(isGravel(p.x,p.z),false);assert.equal(isGravel(p.x+5,p.z),true);assert.equal(isGravel(-26,-9),false);assert.equal(isGravel(-16,-9),true);
 });
 test('dust starts on gravel at speed, stays bounded, stops on asphalt and dissipates',()=>{
  const dust=new RoadDust(),p=roadPoint(Math.PI/2),state={phase:'jeep',status:'running',x:p.x,z:p.z,y:p.y,heading:Math.PI,speed:18};
@@ -39,3 +39,4 @@ test('paved branch is clipped at main-road asphalt edge instead of stacking junc
  assert.ok(p.count>0&&p.array.every(Number.isFinite));
  for(let i=0;i<p.count;i++){let distance=Infinity;const x=p.getX(i),z=p.getZ(i);for(let j=1;j<main.length;j++){const a=main[j-1],b=main[j],dx=b.x-a.x,dz=b.z-a.z,t=T.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);distance=Math.min(distance,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));}assert.ok(distance>4.19,`Branch overlaps main asphalt at ${distance}`);}
 });
+

@@ -37,7 +37,7 @@ export function isGravel(x,z){
  if(driveDistance<2.25)return false;
  if(driveDistance<3.7)return true;
  const d=Math.abs(roadOffset(x,z));if(d>=4.2&&d<7.5)return true;
- return x>-26.5&&x<-5&&z>-18&&z<-2;
+ return x>-30&&x<-11&&z>-22&&z<5;
 }
 
 /** Trim branch asphalt at the main-road edge, avoiding stacked junction faces. */
@@ -51,3 +51,4 @@ export function clipRibbonOutsideRoad(geometry,centerline,halfWidth){
  }
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.computeVertexNormals();return g;
 }
+

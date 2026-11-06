@@ -47,16 +47,32 @@ export class WaterWake extends THREE.Points{
  constructor(){
   const count=160,g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(count*3),3));g.setAttribute('aSize',new THREE.Float32BufferAttribute(new Float32Array(count),1));g.setAttribute('aAlpha',new THREE.Float32BufferAttribute(new Float32Array(count),1));
   const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,vertexShader:`attribute float aSize,aAlpha;varying float vAlpha;void main(){vAlpha=aAlpha;vec4 p=modelViewMatrix*vec4(position,1.);gl_PointSize=min(55.,aSize*400./max(2.,-p.z));gl_Position=projectionMatrix*p;}`,fragmentShader:`varying float vAlpha;void main(){float r=length(gl_PointCoord-.5)*2.;gl_FragColor=vec4(.83,.94,.97,pow(max(0.,1.-r*r),2.)*vAlpha);}`});
-  super(g,m);this.name='Floatplane water wake and touchdown spray';this.frustumCulled=false;this.pool=Array.from({length:count},()=>({age:10,life:1}));this.next=0;this.emission=0;this.seed=43;this.lastTouchdown=-1;
+  super(g,m);this.name='Floatplane water wake and touchdown spray';this.frustumCulled=false;this.pool=Array.from({length:count},()=>({age:10,life:1}));this.next=0;this.emission=0;this.seed=43;this.lastTouchdown=-1;this.splashAge=10;
+  this.foam=new THREE.Group();this.foam.name='Paired expanding float touchdown foam';
+  for(let i=0;i<2;i++){const ring=new THREE.Mesh(new THREE.RingGeometry(.65,1,32),new THREE.MeshBasicMaterial({color:0xddeff0,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.visible=false;this.foam.add(ring);}this.add(this.foam);
  }
  random(){this.seed=(this.seed*1664525+1013904223)>>>0;return this.seed/4294967296;}
- emitParticle(state,burst){const side=this.random()>.5?1:-1,p=this.pool[this.next];this.next=(this.next+1)%this.pool.length;Object.assign(p,{x:state.x+Math.cos(state.heading)*side*1.1-Math.sin(state.heading),z:state.z+Math.sin(state.heading)*side*1.1+Math.cos(state.heading),y:.08,vx:(this.random()-.5)*(burst?4:1)-Math.sin(state.heading)*state.speed*.1,vz:(this.random()-.5)*(burst?4:1)+Math.cos(state.heading)*state.speed*.1,vy:burst?1.3+this.random()*1.8:.15,age:0,life:burst?1.4:2.5,size:burst?.12:.3});}
+ emitParticle(state,burst){
+  const side=this.random()>.5?1:-1,p=this.pool[this.next],forward=Math.sin(state.heading),north=Math.cos(state.heading),along=(this.random()-.5)*5.4;
+  this.next=(this.next+1)%this.pool.length;
+  const lateral=side*(burst?2.2+this.random()*2.8:.35),trail=-state.speed*(burst?.12:.1);
+  Object.assign(p,{x:state.x+north*side*1.15+forward*along,z:state.z+forward*side*1.15-north*along,y:.12,
+   vx:north*lateral+forward*trail,vz:forward*lateral-north*trail,vy:burst?2+this.random()*2:.15,
+   age:0,life:burst?1.6:2.5,size:burst?.32+this.random()*.25:.3,alpha:burst?.82:.46});
+ }
+
  update(state,dt){
   dt=Math.max(0,Math.min(dt,.05));const active=state.phase==='plane'&&state.status==='running';
-  if(active&&state.touchdownAge>=0&&(this.lastTouchdown<0||state.touchdownAge<this.lastTouchdown))for(let i=0;i<48;i++)this.emitParticle(state,true);
+  if(active&&state.onWater&&state.touchdownAge>=0&&(this.lastTouchdown<0||state.touchdownAge<this.lastTouchdown)){
+   for(let i=0;i<96;i++)this.emitParticle(state,true);this.splashAge=0;
+   this.foam.position.set(state.x,.065,state.z);this.foam.rotation.y=-state.heading;
+  }
+  this.splashAge+=dt;
+  for(let i=0;i<2;i++){const ring=this.foam.children[i],age=this.splashAge;ring.visible=age<2.2;ring.position.x=i?1.15:-1.15;ring.scale.set(.6+age*2,1.8+age*3,1);ring.material.opacity=Math.max(0,.5*(1-age/2.2));}
   this.lastTouchdown=state.phase==='plane'?state.touchdownAge:-1;
-  if(active&&state.onWater&&!state.parked&&state.speed>1){this.emission+=state.speed*3*dt;while(this.emission>=1){this.emission--;this.emitParticle(state,false);}}
-  for(let i=0;i<this.pool.length;i++){const p=this.pool[i];p.age+=dt;if(p.age>=p.life){this.geometry.attributes.aAlpha.setX(i,0);continue;}p.x+=p.vx*dt;p.z+=p.vz*dt;p.y=Math.max(.035,p.y+p.vy*dt);p.vy-=5*dt;this.geometry.attributes.position.setXYZ(i,p.x,p.y,p.z);this.geometry.attributes.aSize.setX(i,p.size+p.age*.35);this.geometry.attributes.aAlpha.setX(i,.46*(1-p.age/p.life));}
+  if(active&&state.onWater&&!state.parked&&Math.abs(state.speed)>.5){this.emission+=Math.abs(state.speed)*3*dt;while(this.emission>=1){this.emission--;this.emitParticle(state,false);}}
+  for(let i=0;i<this.pool.length;i++){const p=this.pool[i];p.age+=dt;if(p.age>=p.life){this.geometry.attributes.aAlpha.setX(i,0);continue;}p.x+=p.vx*dt;p.z+=p.vz*dt;p.y=Math.max(.035,p.y+p.vy*dt);p.vy-=5*dt;this.geometry.attributes.position.setXYZ(i,p.x,p.y,p.z);this.geometry.attributes.aSize.setX(i,p.size+p.age*.35);this.geometry.attributes.aAlpha.setX(i,p.alpha*(1-p.age/p.life));}
   for(const a of Object.values(this.geometry.attributes))a.needsUpdate=true;
  }
 }
+

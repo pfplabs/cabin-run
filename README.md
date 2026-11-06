@@ -17,10 +17,12 @@ python 3 -m http.server 4173
 
 ## Controls
 
+- Choose **Drive Jeep** or **Fly Plane** in the top bar. The Jeep starts in the cabin parking bay facing the access aisle. V still switches vehicles.
 - Jeep: W/S or arrows accelerate/reverse; A/D steer; Control brakes. Normal top speed is 79 km/h, or 101 km/h with Shift. Steering, lateral grip and four-wheel suspension are smoothed. Slow for corners.
 - Plane: press Space to start the engine and wait three seconds. Hold Shift to increase throttle, then W to lift off above 36 km/h. Releasing Shift holds power. W/S changes pitch; A/D banks and steers. The actual ailerons, elevators and rudder move.
+- Plane pushback: at idle on the water, hold B (or touch PUSH BACK) to push backward at walking pace. Release to slow, Control to stop. It cannot reverse in flight or while moored.
 - Plane Control: reduces power in the air. On the water it also brakes the taxi motion. The HUD distinguishes these functions and shows throttle, airspeed and RPM.
-- Landing: approach the cabin between the two buoy lines, reduce power and descend. Touchdown is physical water contact with flare/settling and spray, not a teleport. Taxi slowly to the extended pier; Space moors within 10 m at under 11 km/h. Space releases the mooring, then another Space starts the engine.
+- Landing: approach the cabin between the two buoy lines, reduce power and descend. Touchdown is physical water contact with flare/settling, paired expanding foam rings and a bounded spray burst, not a teleport. Taxi slowly to the extended pier; Space moors within 10 m at under 11 km/h. Space releases the mooring, then another Space starts the engine.
 - V switches vehicle starting points. This remains a quick scene selector, not an on-foot boarding sequence.
 - C cycles heading-follow orbit, world-relative wide orbit and a fixed cabin view. Drag to orbit, scroll/pinch to zoom. Horizontal or diagonal trackpad swipes orbit; Shift+scroll is an explicit fallback. The camera ducks inside the tunnel and restores preferred zoom outside.
 - P/Escape pauses. Losing focus pauses and clears held controls. Touch driving buttons, one-finger orbit and two-finger pinch are supported.
@@ -30,11 +32,11 @@ python 3 -m http.server 4173
 
 The lake is 936 ×684 m, nine times the preceding lake's area and 36 times the first 3D version's area. Cabin, vehicles, human doors, dock and parking retain real-world scale. The approximately 3.63 km road climbs a 70 m ridge, passes through a clean carved tunnel with three real lake-view openings, then descends around the lake.
 
-Asphalt is 8.4 m wide. The cabin approach uses the same paving, clipped at the junction to avoid stacked surfaces. Distinct textured gravel shoulders and parking produce speed-dependent tyre dust. The driveway has metre-spaced geometry and is checked against the actual land mesh. Three parking bays serve the enlarged timber cabin, with its balcony, wraparound glazing and furnished interior.
+Asphalt is 8.4 m wide. The cabin approach uses the same paving, clipped at the junction to avoid stacked surfaces. Distinct textured gravel shoulders and parking produce speed-dependent tyre dust. The driveway has metre-spaced geometry and is checked against the actual land mesh. Three perpendicular parking bays face a straight access aisle on a level forecourt and serve the enlarged timber cabin, with its balcony, wraparound glazing and furnished interior.
 
 The pier extends toZ 36 with a verified floatplane berth. Float clearance, wing clearance and water immersion have been checked against the exported model. Taxi collision prevents passing through the pier.
 
-A translucent flight edge and eight-second return countdown permit manual recovery before gentle steering assistance. The flight ceiling is 140 m. There are no rings, crates, races or imposed objectives.
+A translucent flight edge and eight-second return countdown permit manual recovery before gentle steering assistance. The flight ceiling is 1,400 m, above the roughly 890 m snow-covered summit behind the tunnel. There are no rings, crates, races or imposed objectives.
 
 ## Visuals and performance
 
@@ -59,8 +61,13 @@ Blender 4.3+ recreates the editable `.blend` and `.glb`. Tests cover input-drive
 
 Three.js 0.183.2 is MIT-licensed, see `vendor/THREE-LICENSE`. Texture attribution is in `assets/pbr/SOURCES.md` and linked from the game.
 
+## Latest verification
+
+Automated regressions cover the continuous mountain slope, high summit, pushback, higher flight, cabin parking departure, paired touchdown foam, upright forest cards, sign placement and hero material setup. These are code/geometry checks; the latest visual changes and actual FPS still need a WebGL browser review. The lake outline remains elliptical pending its separate bays-and-shores pass.
+
 ## Later milestones
 
 Cockpit views for jeep and plane follow the visual work. The final gameplay trailers and retrospective article are deferred until the user is satisfied.
 
 For later genuine browser capture, install Playwright separately, start the static server and run `node scripts/record-gameplay.mjs` on a WebGL-capable desktop. It records actual frames driven by scripted controls and saves unedited WebM/screenshots. This helper has not been GPU-verified in the cloud. No Blender or generated frame is substituted for gameplay.
+

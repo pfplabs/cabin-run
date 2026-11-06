@@ -1,5 +1,5 @@
 /** Pure simulation rules for a small bounded alpine lake. Distances are metres. */
-export const WORLD={scale:6,roadRadius:564,centerZ:352,northLimit:-302,flightNorthLimit:-300,flightCeiling:140};
+export const WORLD={scale:6,roadRadius:564,centerZ:352,northLimit:-302,flightNorthLimit:-300,flightCeiling:1400};
 export const JEEP={maxSpeed:22,boostSpeed:28,reverseSpeed:6,wheelbase:2.8,halfTrack:.95,maxSteeringAngle:.55,maxLateralAcceleration:9,acceleration:4.8,braking:8.5};
 export const CABIN_BOUNDS={minX:-4.2,maxX:25.2,minZ:-28,maxZ:-.8,roofHeight:13};
 const jeepState=()=>({steeringAngle:0,acceleration:0,suspensionVelocity:0,groundHeight:null});
@@ -14,11 +14,11 @@ const routeRadius=a=>WORLD.roadRadius+36*Math.sin(3*a)+18*Math.sin(7*a);
 const routeHeight=a=>1.1+70*Math.exp(-((wrap(a-.2)/.78)**2));
 export function roadPoint(a){const r=routeRadius(a);return {x:r*Math.sin(a),y:routeHeight(a),z:WORLD.centerZ-r*Math.cos(a)};}
 export function roadOffset(x,z){const a=Math.atan2(x,WORLD.centerZ-z);return Math.hypot(x,z-WORLD.centerZ)-routeRadius(a);}
-export const DRIVEWAY=[roadPoint(-.65),{x:-230,z:-28,y:14.5},{x:-130,z:-19,y:8.5},{x:-58,z:-14,y:4},{x:-37,z:-19,y:2},{x:-23,z:-15,y:1.1},{x:-16,z:-9,y:1.1},{x:-18,z:3,y:1.1}];
+export const DRIVEWAY=[roadPoint(-.65),{x:-230,z:-28,y:14.5},{x:-130,z:-19,y:8.5},{x:-58,z:-14,y:4},{x:-37,z:-19,y:2},{x:-31,z:-19,y:1.1},{x:-26,z:-19,y:1.1},{x:-26,z:-9,y:1.1},{x:-26,z:3,y:1.1}];
 export const DOCK={x:-23.7,z:30};
 export const DOCK_BOUNDS={minX:-21.20,maxX:-14.925,minZ:2,maxZ:36,maxY:2.025};
 export const HOME={x:-16,z:-9};
-export const PARKING=[{x:-23,z:-11,width:4.6,length:7},{x:-16,z:-11,width:4.6,length:7},{x:-9,z:-11,width:4.6,length:7}];
+export const PARKING=[{x:-16,z:-16,width:4.6,length:7},{x:-16,z:-9,width:4.6,length:7},{x:-16,z:-2,width:4.6,length:7}];
 export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export const lakeRadius=(x,z)=>Math.hypot(x/LAKE.rx,(z-LAKE.z)/LAKE.rz);
 export const roadRadius=(x,z)=>Math.hypot(x/WORLD.roadRadius,(z-WORLD.centerZ)/WORLD.roadRadius);
@@ -38,6 +38,9 @@ export function terrainHeight(x,z){
  }
  const blend=(1-smooth((distance-2.5)/7.5))*smooth((offset-6)/6);
  height+=(driveHeight-height)*blend;
+ // A level forecourt joins the straight aisle and perpendicular parking bays.
+ const apronDistance=Math.hypot(Math.max(-31-x,0,x+11),Math.max(-22-z,0,z-4));
+ height+=(1.1-height)*(1-smooth(apronDistance/2));
  // The foundation is level; its narrow feather ends before the west driveway/parking.
  const foundationDistance=Math.hypot(Math.max(-2.8-x,0,x-23.8),Math.max(-26.4-z,0,z+6.5));
  return height+(1.1-height)*(1-smooth(foundationDistance/2.2));
@@ -61,7 +64,7 @@ export function togglePause(s){if(s.status==='running')s.status='paused';else if
 export function switchVehicle(s,vehicle){
  if(!['jeep','plane'].includes(vehicle))return false;
  Object.assign(s,flightState(),jeepState());s.phase=vehicle;s.speed=0;s.roll=0;s.pitch=0;s.actionReady=false;s.takeoff=0;s.parked=false;s.arrived=false;
- if(vehicle==='jeep'){const p=roadPoint(-1.82),q=roadPoint(-1.819);s.x=p.x;s.z=p.z;s.y=terrainHeight(s.x,s.z);s.heading=Math.atan2(q.x-p.x,p.z-q.z);}
+ if(vehicle==='jeep'){s.x=HOME.x;s.z=HOME.z;s.y=terrainHeight(s.x,s.z);s.heading=-Math.PI/2;}
  else {s.x=-40;s.z=591;s.y=FLIGHT.waterHeight;s.heading=0;s.onWater=true;s.propRPM=0;}
  return true;
 }
@@ -187,12 +190,13 @@ function updatePlane(s,input,steer,dt){
   s.propRPM=approach(s.propRPM,FLIGHT.idleRPM+(FLIGHT.maxRPM-FLIGHT.idleRPM)*s.throttle,2.2,dt);
  }else if(s.enginePhase==='off'){s.throttle=0;s.propRPM=approach(s.propRPM,0,3,dt);}
  const recovering=s.boundaryStatus==='recovering';
- const targetSpeed=recovering?Math.min(16,Math.max(12,s.throttle*FLIGHT.maxSpeed)):s.throttle*FLIGHT.maxSpeed;
+ const pushBack=s.onWater&&input.reverse&&!input.boost&&!input.brake&&s.throttle<.03&&s.speed<2;
+ const targetSpeed=pushBack?-1.4:recovering?Math.min(16,Math.max(12,s.throttle*FLIGHT.maxSpeed)):s.throttle*FLIGHT.maxSpeed;
  const speedDelta=(targetSpeed-s.speed)*(1-Math.exp(-.65*dt));
- s.speed=clamp(s.speed+clamp(speedDelta,-3.8*dt,3.1*dt),0,FLIGHT.maxSpeed);
- if(s.onWater&&input.brake)s.speed=Math.max(0,s.speed-FLIGHT.waterBrake*dt);
- if(s.speed<.02&&!s.throttle)s.speed=0;
- const authority=clamp(s.speed/10,0,1);
+ s.speed=clamp(s.speed+clamp(speedDelta,-3.8*dt,3.1*dt),s.onWater?-1.4:0,FLIGHT.maxSpeed);
+ if(s.onWater&&input.brake)s.speed=Math.sign(s.speed)*Math.max(0,Math.abs(s.speed)-FLIGHT.waterBrake*dt);
+ if(Math.abs(s.speed)<.02&&!s.throttle&&!pushBack)s.speed=0;
+ const authority=s.onWater?clamp(s.speed/4,-.35,1):clamp(s.speed/10,0,1);
  let targetYaw=steer*.65*authority;
  if(recovering){const inward=Math.atan2(-s.x,s.z-WORLD.centerZ);targetYaw=clamp(wrap(inward-s.heading)*1.4,-.65,.65);}
  s.yawRate=approach(s.yawRate,targetYaw,2.5,dt);s.heading+=s.yawRate*dt;
@@ -209,7 +213,7 @@ function updatePlane(s,input,steer,dt){
  // A gentle flare cushions water contact; no scripted position jump or forced landing.
  let climb=s.onWater?0:clamp(Math.sin(s.pitch)*s.speed,-7,7)-(s.speed<8?(8-s.speed)*.2:0);
  if(flaring)climb=-clamp((s.y-FLIGHT.waterHeight)*.7,.25,1.2);
- const ahead=Math.max(8,s.speed*1.25),forwardX=Math.sin(s.heading),forwardZ=-Math.cos(s.heading);
+ const ahead=(s.speed<0?-1:1)*Math.max(8,Math.abs(s.speed)*1.25),forwardX=Math.sin(s.heading),forwardZ=-Math.cos(s.heading);
  const aheadX=s.x+forwardX*ahead,aheadZ=s.z+forwardZ*ahead;
  const aheadClearance=s.onWater&&lakeRadius(aheadX,aheadZ)<.995?FLIGHT.waterHeight:flightClearance(aheadX,aheadZ);
  if(aheadClearance>s.y&&(!s.onWater||s.speed>FLIGHT.liftSpeed*.8))climb=Math.max(climb,clamp((aheadClearance-s.y)*1.6,0,10));
@@ -217,7 +221,7 @@ function updatePlane(s,input,steer,dt){
  const nextX=s.x+forwardX*s.speed*dt,nextZ=s.z+forwardZ*s.speed*dt;
  const floatHalfX=Math.abs(Math.cos(s.heading))*1.7+Math.abs(Math.sin(s.heading))*3.3,floatHalfZ=Math.abs(Math.sin(s.heading))*1.7+Math.abs(Math.cos(s.heading))*3.3;
  const hitPier=s.onWater&&nextX+floatHalfX>DOCK_BOUNDS.minX&&nextX-floatHalfX<DOCK_BOUNDS.maxX&&nextZ+floatHalfZ>DOCK_BOUNDS.minZ&&nextZ-floatHalfZ<DOCK_BOUNDS.maxZ;
- if(hitPier){if(s.speed>1)bump(s,'Pier ahead. Slow and steer away from the pilings.');s.speed=0;}else{s.x=nextX;s.z=nextZ;}
+ if(hitPier){if(Math.abs(s.speed)>1)bump(s,'Pier ahead. Slow and steer away from the pilings.');s.speed=0;}else{s.x=nextX;s.z=nextZ;}
  const b=FLIGHT_BOUNDARY,r=roadRadius(s.x,s.z);
  if(r>b.hardRadius){s.x*=b.hardRadius/r;s.z=WORLD.centerZ+(s.z-WORLD.centerZ)*b.hardRadius/r;}
  s.z=Math.max(s.z,b.hardNorth);
@@ -238,6 +242,6 @@ function updatePlane(s,input,steer,dt){
   if(wasOnWater){s.touchdownAge=-1;s.events.push({type:'takeoff',text:'Airborne. Reduce power with Control before your landing approach.'});}
   s.landingStatus=s.landingAligned&&s.y<25&&s.speed<21?'approach':'airborne';
  }
- s.actionReady=s.enginePhase==='running'&&s.onWater&&Math.hypot(s.x-DOCK.x,s.z-DOCK.z)<10&&s.speed<3;
+ s.actionReady=s.enginePhase==='running'&&s.onWater&&Math.hypot(s.x-DOCK.x,s.z-DOCK.z)<10&&Math.abs(s.speed)<3;
 }
 

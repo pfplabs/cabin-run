@@ -22,3 +22,12 @@ test('water wake and touchdown spray are bounded and decay after physical contac
  state.touchdownAge=0;wake.update(state,1/60);assert.ok(wake.pool.some(p=>p.vy>1));assert.equal(wake.pool.length,160);assert.ok(wake.geometry.attributes.position.array.every(Number.isFinite));
  state.speed=0;for(let i=0;i<240;i++){state.touchdownAge+=1/60;wake.update(state,1/60);}assert.equal(wake.pool.filter(p=>p.age<p.life).length,0);
 });
+
+
+test('physical landing triggers one visible paired foam splash, with no taxi retrigger',async()=>{
+ const {WaterWake}=await import('../flight-effects.js');const wake=new WaterWake(),s={phase:'plane',status:'running',onWater:false,parked:false,x:0,z:200,heading:.3,speed:14,touchdownAge:-1};
+ wake.update(s,.02);assert.ok(wake.foam.children.every(r=>!r.visible));
+ s.onWater=true;s.touchdownAge=0;wake.update(s,.02);assert.equal(wake.pool.filter(p=>p.age<p.life&&p.alpha>.8).length,96);assert.ok(wake.foam.children.every(r=>r.visible));
+ assert.ok(wake.pool.some(p=>p.size>.4&&p.vy>2));
+ s.speed=0;for(let i=0;i<150;i++){s.touchdownAge+=.02;wake.update(s,.02);}assert.ok(wake.foam.children.every(r=>!r.visible));assert.equal(wake.pool.filter(p=>p.age<p.life).length,0);
+});

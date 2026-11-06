@@ -4,6 +4,7 @@ import * as E from '../engine.js';
 const step=(s,input={},seconds=1)=>{for(let t=0;t<seconds-1e-8;t+=.02)E.update(s,input,.02);return s;};
 const running=(vehicle='jeep')=>{const s=E.fresh();E.begin(s,vehicle);return s;};
 const startEngine=s=>{assert.equal(E.action(s),true);step(s,{},E.FLIGHT.startupSeconds);assert.equal(s.enginePhase,'running');return s;};
+const onRoad=s=>{const p=E.roadPoint(-1.82),q=E.roadPoint(-1.819);Object.assign(s,{x:p.x,z:p.z,y:p.y,heading:Math.atan2(q.x-p.x,p.z-q.z)});return s;};
 const startedPlane=()=>startEngine(running('plane'));
 const near=(actual,expected,tolerance=1e-8)=>assert.ok(Math.abs(actual-expected)<tolerance,`${actual} != ${expected}`);
 
@@ -94,7 +95,7 @@ test('expanded lake is nine times the previous area and preserves cabin landmark
  near((Math.PI*E.LAKE.rx*E.LAKE.rz)/(Math.PI*156*114),9);near((Math.PI*E.LAKE.rx*E.LAKE.rz)/(Math.PI*78*57),36);
  assert.deepEqual(E.HOME,{x:-16,z:-9});assert.deepEqual(E.DOCK,{x:-23.7,z:30});
  near(E.roadRadius(0,E.WORLD.centerZ-E.WORLD.roadRadius),1);
- const jeep=running(),plane=running('plane');assert.deepEqual([jeep.x,jeep.z],[E.roadPoint(-1.82).x,E.roadPoint(-1.82).z]);assert.deepEqual([plane.x,plane.z],[-40,591]);
+ const jeep=running(),plane=running('plane');assert.deepEqual([jeep.x,jeep.z],[E.HOME.x,E.HOME.z]);assert.deepEqual([plane.x,plane.z],[-40,591]);
 });
 test('jeep raised speed limits and floatplane limit are enforced',()=>{
  for(const [input,limit] of [[{up:true},22],[{up:true,boost:true},28],[{down:true},-6]]){
@@ -109,17 +110,17 @@ test('jeep raised speed limits and floatplane limit are enforced',()=>{
  near(plane.speed,0,1e-6);near(plane.throttle,0);near(plane.propRPM,E.FLIGHT.idleRPM,1e-5);
 });
 
-function follow(s,points){
+function follow(s,points,speed=7){
  let n=0,maxY=s.y;
  for(let i=0;i<30000&&n<points.length;i++){
   const p=points[n];if(Math.hypot(p.x-s.x,p.z-s.z)<1.2){n++;continue;}
   const target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading),Math.cos(target-s.heading));
-  E.update(s,{up:s.speed<7,left:error<-.015,right:error>.015},.02);maxY=Math.max(maxY,s.y);
+  E.update(s,{up:s.speed<speed,brake:s.speed>speed+.5,left:error<-.015,right:error>.015},.02);maxY=Math.max(maxY,s.y);
  }
  assert.equal(n,points.length,`Stuck ${n}/${points.length}: ${JSON.stringify(s)}`);return maxY;
 }
 test('winding road is continuous, elevated, and drivable for a complete loop through tunnel',()=>{
- const s=running(),points=[];
+ const s=onRoad(running()),points=[];
  for(let a=-1.82+.025;a<-1.82+Math.PI*2;a+=.025){
   const p=E.roadPoint(a);near(E.roadOffset(p.x,p.z),0);near(E.terrainHeight(p.x,p.z),p.y);
   assert.ok(E.roadRadius(p.x,p.z)<1.14);points.push(p);
@@ -210,7 +211,7 @@ test('new cabin foundation is flat and expanded footprint blocks jeep and protec
 });
 
 test('keyboard lane following remains controlled at raised speed through slopes and tunnel',()=>{
- const s=running(),lane=1.9;let last=-1.82,progress=0,peak=0,maxGroundError=0;
+ const s=onRoad(running()),lane=1.9;let last=-1.82,progress=0,peak=0,maxGroundError=0;
  for(let i=0;i<20000&&progress<Math.PI*2;i++){
   const a=Math.atan2(s.x,E.WORLD.centerZ-s.z),p=E.roadPoint(a+.03);
   p.x+=Math.sin(a+.03)*lane;p.z-=Math.cos(a+.03)*lane;
@@ -259,4 +260,23 @@ test('expanded lake keeps the original physical shore margin and dock-side drive
 test('extended dock berth floats clear of pier and water taxi cannot pass through pilings',()=>{
  const s=running('plane');Object.assign(s,{enginePhase:'running',propRPM:650,onWater:true,x:E.DOCK.x,z:E.DOCK.z,y:E.FLIGHT.waterHeight,heading:0,speed:0});E.update(s,{},.02);assert.equal(s.actionReady,true);assert.equal(E.action(s),true);
  const taxi=running('plane');Object.assign(taxi,{enginePhase:'running',propRPM:1800,throttle:.5,onWater:true,x:-23.5,z:22,y:E.FLIGHT.waterHeight,heading:Math.PI/2,speed:4});const x=taxi.x;E.update(taxi,{},.02);assert.ok(taxi.x<=x+.1);assert.equal(taxi.speed,0);assert.match(taxi.events.at(-1).text,/Pier/);
+});
+
+
+test('floatplane pushback is slow, water-only, stops on release, and respects brake and mooring',()=>{
+ const s=running('plane');Object.assign(s,{x:0,z:300,heading:0});const z=s.z;
+ step(s,{reverse:true},4);assert.ok(s.speed<-.9&&s.speed>=-1.4);assert.ok(s.z>z+2);assert.equal(s.onWater,true);near(s.y,E.FLIGHT.waterHeight);
+ step(s,{brake:true,reverse:true},1);near(s.speed,0);
+ step(s,{reverse:true},2);step(s,{},8);near(s.speed,0,.02);
+ Object.assign(s,{onWater:false,y:30,speed:0});step(s,{reverse:true},1);assert.ok(s.speed>=0);
+ Object.assign(s,{parked:true,onWater:true,y:E.FLIGHT.waterHeight,speed:0});const pos=[s.x,s.z];step(s,{reverse:true},2);assert.deepEqual([s.x,s.z],pos);
+});
+test('plane can cruise far above the old ceiling and the mountain summit',()=>{
+ assert.ok(E.WORLD.flightCeiling>=1200);
+ const s=startedPlane();Object.assign(s,{x:0,z:300,y:950,onWater:false,speed:24,throttle:.9});step(s,{up:true},3);assert.ok(s.y>960);assert.ok(s.y<E.WORLD.flightCeiling);
+});
+test('Jeep starts in a marked cabin bay and can leave through the access aisle',()=>{
+ const s=running(),bay=E.PARKING.find(p=>p.x===s.x&&p.z===s.z);assert.ok(bay);near(s.heading,-Math.PI/2);
+ follow(s,[{x:-26,z:-9},{x:-26,z:-19},...E.DRIVEWAY.slice(0,-3).reverse()],3);
+ assert.ok(!s.events.some(e=>e.type==='bump'));assert.ok(Math.abs(E.roadOffset(s.x,s.z))<4);
 });

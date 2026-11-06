@@ -24,7 +24,9 @@ export function createForest(heightAt,roadRadius){
   for(let j=0;j<22;j++){
     const y=28+j*21,spread=18+j*9.2;
     for(const sign of [-1,1]){
-      const end=[256+spread*sign,y-32-random()*15];stroke([256,y+14],end,'#668053',4);
+      const end=[256+spread*sign,y-32-random()*15];stroke([256,y+14],end,'#426744',11);
+      // A dense needle core reads as a forest canopy rather than bare fern stems.
+      stroke([256,y+5],[256+spread*.82*sign,y-13],'#52744a',18);
       for(let k=1;k<25;k++){
         const t=k/25,x=256+(end[0]-256)*t,yy=y+14+(end[1]-y-14)*t;
         for(const d of [-1,1])stroke([x,yy],[x+sign*(13+random()*21),yy+d*(10+random()*16)-4],random()>.45?'#51774b':'#78975e',1.9+random()*1.5);
@@ -38,12 +40,13 @@ export function createForest(heightAt,roadRadius){
   const bark=new THREE.MeshStandardMaterial({color:0x70624f,roughness:1});
   function geometry(distant,variant=0){
     const positions=[],uvs=[],indices=[];
-    const quad=(points)=>{const base=positions.length/3;for(const p of points)positions.push(...p.toArray());uvs.push(0,1,1,1,1,0,0,0);indices.push(base,base+1,base+2,base,base+2,base+3);};
+    const quad=(points,upright=false)=>{const base=positions.length/3;for(const p of points)positions.push(...p.toArray());uvs.push(...(upright?[0,0,1,0,1,1,0,1]:[0,1,1,1,1,0,0,0]));indices.push(base,base+1,base+2,base,base+2,base+3);};
     if(distant){
+      // CanvasTexture top is v=1: root must sample v=0, apex v=1.
       // Three full-height alpha silhouettes avoid the empty edge-on billboard.
       for(let i=0;i<3;i++){
         const a=i*Math.PI/3,dx=Math.cos(a)*.29,dz=Math.sin(a)*.29;
-        quad([new THREE.Vector3(-dx,.07,-dz),new THREE.Vector3(dx,.07,dz),new THREE.Vector3(dx,1,dz),new THREE.Vector3(-dx,1,-dz)]);
+        quad([new THREE.Vector3(-dx,.07,-dz),new THREE.Vector3(dx,.07,dz),new THREE.Vector3(dx,1,dz),new THREE.Vector3(-dx,1,-dz)],true);
       }
     }else{
       const tiers=11+variant,spread=[.30,.245,.34][variant];
@@ -66,7 +69,7 @@ export function createForest(heightAt,roadRadius){
   function segmentDistance(x,z,a,b){const dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);return Math.hypot(x-a.x-t*dx,z-a.z-t*dz);}
   const occupied=new Set();
   function valid(x,z,spacing){
-    const r=roadRadius(x,z);
+    
     if(Math.abs(roadOffset(x,z))<14||lakeRadius(x,z)<1+8.5/LAKE.rz)return false;
     const angle=Math.atan2(x,WORLD.centerZ-z);if(angle>TUNNEL.startAngle-.04&&angle<TUNNEL.endAngle+.04&&Math.abs(roadOffset(x,z))<29)return false;
     // Cabin, terrace and apron remain clear. No stand blocks the access lane.
@@ -77,7 +80,7 @@ export function createForest(heightAt,roadRadius){
     if(occupied.has(key))return false;occupied.add(key);return true;
   }
   const near=[],far=[];
-  function add(list,x,z,hero=false){if(!valid(x,z,hero?2.8:4))return;list.push({x,z,h:hero?7+random()*10:9+random()*15,w:.76+random()*.45,angle:random()*Math.PI*2,tint:random(),lean:(random()-.5)*.035});}
+  function add(list,x,z,hero=false){if(!valid(x,z,hero?2.8:4))return;list.push({x,z,h:hero?7+random()*10:6+Math.pow(random(),.65)*19,w:.76+random()*.45,angle:random()*Math.PI*2,tint:random(),lean:(random()-.5)*.035});}
   // Irregular small groves behind the enlarged cabin, away from driveway.
   const groves=[[-4,-40],[21,-43],[37,-33],[-31,-29],[48,-46]];
   for(let i=0;i<1200&&near.length<95;i++){
@@ -87,12 +90,12 @@ export function createForest(heightAt,roadRadius){
   const heroCount=near.length;
   // Clustered density varies around the valley, rather than a regular tree wall.
   for(let i=0;i<30000&&near.length<1500;i++){
-    const a=random()*Math.PI*2,p=roadPoint(a),r=Math.hypot(p.x,p.z-WORLD.centerZ)+(random()>.5?1:-1)*(18+Math.sqrt(random())*70),x=Math.sin(a)*r,z=WORLD.centerZ-Math.cos(a)*r;
+    const a=random()*Math.PI*2,p=roadPoint(a),r=Math.hypot(p.x,p.z-WORLD.centerZ)+(random()>.5?1:-1)*(15+Math.pow(random(),1.5)*80),x=Math.sin(a)*r,z=WORLD.centerZ-Math.cos(a)*r;
     const density=.7+.22*Math.sin(a*7)+.08*Math.cos(x*.09+z*.06);
     if(random()<density)add(near,x,z);
   }
   for(let i=0;i<80000&&far.length<8000;i++){
-    const a=random()*Math.PI*2,r=WORLD.roadRadius*(1.15+Math.sqrt(random())*1.85),x=Math.cos(a)*r,z=WORLD.centerZ+Math.sin(a)*r;
+    const a=random()*Math.PI*2,r=WORLD.roadRadius*(1.06+Math.pow(random(),1.3)*1.94),x=Math.cos(a)*r,z=WORLD.centerZ+Math.sin(a)*r;
     if(random()<.8+.17*Math.sin(a*11))add(far,x,z);
   }
   const group=new THREE.Group();group.name='Spatially chunked alpine forest';
@@ -223,3 +226,4 @@ export function createForest(heightAt,roadRadius){
   group.updateLOD(new THREE.Vector3(-49,24,55));
   return group;
 }
+

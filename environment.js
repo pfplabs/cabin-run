@@ -185,13 +185,14 @@ export function createMountainTunnel(){
 }
 export function createParkingLot(){
  const group=new THREE.Group();group.name='Cabin side-road parking';
- const ground=new THREE.PlaneGeometry(20.5,14.5,14,10);ground.rotateX(-Math.PI/2);ground.translate(-16,0,-10);
+ const ground=new THREE.PlaneGeometry(19,27,14,18);ground.rotateX(-Math.PI/2);ground.translate(-20.5,0,-8.5);
  const p=ground.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,terrainHeight(p.getX(i),p.getZ(i))+.08);ground.computeVertexNormals();
  const gravel=new THREE.Mesh(clipRibbonOutsideRoad(ground,DRIVEWAY,2.25),createGravelMaterial());ground.dispose();gravel.receiveShadow=true;group.add(gravel);
  const paint=new THREE.MeshStandardMaterial({color:0xdedbc4,roughness:1,transparent:true,opacity:.82});
  for(const bay of PARKING){
-  for(const side of [-1,1]){const x=bay.x+side*bay.width/2,line=new THREE.Mesh(new THREE.BoxGeometry(.09,.025,bay.length),paint);line.position.set(x,terrainHeight(x,bay.z)+.11,bay.z);group.add(line);}
-  const back=new THREE.Mesh(new THREE.BoxGeometry(bay.width,.025,.09),paint);back.position.set(bay.x,terrainHeight(bay.x,bay.z-bay.length/2)+.11,bay.z-bay.length/2);group.add(back);
+  // Bays face the straight north/south access aisle, never across the asphalt.
+  for(const side of [-1,1]){const z=bay.z+side*bay.width/2,line=new THREE.Mesh(new THREE.BoxGeometry(bay.length,.025,.09),paint);line.position.set(bay.x,terrainHeight(bay.x,z)+.11,z);group.add(line);}
+  const back=new THREE.Mesh(new THREE.BoxGeometry(.09,.025,bay.width),paint);back.position.set(bay.x+bay.length/2,terrainHeight(bay.x+bay.length/2,bay.z)+.11,bay.z);group.add(back);
  }
  return group;
 }

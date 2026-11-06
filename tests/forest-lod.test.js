@@ -89,3 +89,10 @@ test('colour and shadow shaders use main-camera distance and complementary dithe
  assert.match(b.vertexShader,/attribute float lodEligible/);assert.equal(cards.castShadow,false);
  assert.equal(a.uniforms.forestCamera,b.uniforms.forestCamera);assert.equal(a.uniforms.forestCamera,depth.uniforms.forestCamera);
 });
+
+
+test('distant tree cards sample texture roots at bottom and apex at top',()=>{
+ const cards=forest.children[0].children.find(m=>m.name.endsWith('cards'));
+ const p=cards.geometry.attributes.position,uv=cards.geometry.attributes.uv;
+ for(let i=0;i<p.count;i++)assert.equal(uv.getY(i),p.getY(i)<.5?0:1);
+});
