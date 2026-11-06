@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {cabinApproachWidth,cabinApproachSample} from './cabin-turnoff.js';
 import {terrainHeight,explorationAt,roadOffset,DRIVEWAY,onParkingApron} from './engine.js';
 
 /** Dense stations make the road follow the same terrain used by the tyres. */
@@ -12,17 +13,19 @@ export function createRoadRibbonGeometry(points,width,{offset=.08,spacing=1,heig
  for(let i=0;i<stations.length;i++){
   const p=stations[i],prev=stations[Math.max(0,i-1)],next=stations[Math.min(stations.length-1,i+1)],dx=next.x-prev.x,dz=next.z-prev.z,len=Math.hypot(dx,dz)||1;
   if(i)distance+=Math.hypot(p.x-prev.x,p.z-prev.z);
-  for(const side of [-1,1]){const x=p.x-dz/len*width/2*side,z=p.z+dx/len*width/2*side;positions.push(x,heightAt(x,z)+offset,z);uv.push(side===-1?0:width/2,distance/2);}
+  for(const side of [-1,1]){const w=typeof width==='function'?width(distance):width,x=p.x-dz/len*w/2*side,z=p.z+dx/len*w/2*side;positions.push(x,heightAt(x,z)+offset,z);uv.push(side===-1?0:w/2,distance/2);}
   if(i<stations.length-1){const n=i*2;indices.push(n,n+1,n+2,n+1,n+3,n+2);}
  }
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();return g;
 }
+export function createCabinApproachGeometry(width=4.5,options={}){return createRoadRibbonGeometry(DRIVEWAY,d=>cabinApproachWidth(d,width),options);}
+export function cabinTurnoffOpening(x,z){const s=cabinApproachSample(DRIVEWAY,x,z);return s.along<32&&s.distance<s.halfWidth+.4;}
 export {createGravelMaterial} from './gravel-material.js';
 export function isGravel(x,z){
  if(explorationAt(x,z).distance<=0&&Math.abs(roadOffset(x,z))>4.2)return true;
  let driveDistance=Infinity;
  for(let i=1;i<DRIVEWAY.length;i++){const a=DRIVEWAY[i-1],b=DRIVEWAY[i],dx=b.x-a.x,dz=b.z-a.z,t=THREE.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1);driveDistance=Math.min(driveDistance,Math.hypot(x-a.x-t*dx,z-a.z-t*dz));}
- if(driveDistance<2.25)return false;
+ if(driveDistance<cabinApproachSample(DRIVEWAY,x,z).halfWidth)return false;
  if(driveDistance<3.7)return true;
  const d=Math.abs(roadOffset(x,z));if(d>=4.2&&d<7.5)return true;
  return onParkingApron(x,z);

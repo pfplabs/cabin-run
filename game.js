@@ -9,18 +9,18 @@ import {CameraRig} from './camera-rig.js';
 import {CameraObstruction} from './camera-collision.js';
 import {createTerrainMaterial,createRockMaterial} from './landscape-materials.js';
 import {createFlightBarrier,createPropellerBlur,createLandingCorridor,WaterWake} from './flight-effects.js';
-import {createRoadRibbonGeometry,createGravelMaterial,clipRibbonOutsideRoad} from './road-surfaces.js';
+import {createRoadRibbonGeometry,createGravelMaterial,clipRibbonOutsideRoad,createCabinApproachGeometry,cabinTurnoffOpening} from './road-surfaces.js';
 import {RoadDust} from './road-dust.js';
 import {createSkyMaterial,daylightStateAt,applyDaylight} from './daylight-cycle.js';
 import {createLakeWater} from './lake-water.js';
-import * as E from './engine.js?v=dock-berth-1';
+import * as E from './engine.js';
 import {createWaterfallBridge} from './waterfall-bridge.js';
 import {createMinimap} from './minimap.js';
 import {applyHeroMaterials} from './hero-materials.js';
 import {applyVehicleFidelity} from './vehicle-fidelity.js';
 import {applyJeepBody} from './jeep-body.js?v=cockpit-anchor-1';
 import {applyPlaneBody} from './plane-body.js';
-import {createRoadSigns} from './road-signs.js?v=us-signs-1';
+import {createRoadSigns} from './road-signs.js';
 import {createForest} from './foliage.js';
 import {createForestGrass} from './forest-grass.js';
 import {createCabinGrounding} from './cabin-grounding.js';
@@ -79,11 +79,11 @@ function ribbon(points,width,color,y=.025,material=null,add=true){
 const gravelMaterial=createGravelMaterial(),roadDust=new RoadDust();scene.add(roadDust);
 const roadPts=Array.from({length:641},(_,i)=>E.roadPoint(i/640*Math.PI*2));
 ribbon(roadPts,10.4,0x777a70,.06,gravelMaterial);ribbon(roadPts,8.4,0x363c3b,.09,asphaltMaterial);
-for(const [width,y,material,clipWidth] of [[6.5,.06,gravelMaterial,5.2],[4.5,.09,asphaltMaterial,4.2]]){const source=createRoadRibbonGeometry(E.DRIVEWAY,width,{offset:y}),mesh=new THREE.Mesh(clipRibbonOutsideRoad(source,roadPts,clipWidth),material);source.dispose();mesh.receiveShadow=true;scene.add(mesh);}
+for(const [width,y,material,clipWidth] of [[6.5,.06,gravelMaterial,5.2],[4.5,.09,asphaltMaterial,4.2]]){const source=createCabinApproachGeometry(width,{offset:y}),mesh=new THREE.Mesh(clipRibbonOutsideRoad(source,roadPts,clipWidth),material);source.dispose();mesh.receiveShadow=true;scene.add(mesh);}
 scene.add(createExplorationScenery(roadPts,gravelMaterial,asphaltMaterial));
 const roadMarks=[],yellowMarks=[];
 for(let i=0;i<640;i+=5)yellowMarks.push(ribbon([roadPts[i],roadPts[i+1]],.14,0xe9b928,.106,null,false).geometry);
-for(const side of [-1,1]){const edge=roadPts.map((p,i)=>{const prev=roadPts[(i+639)%640],next=roadPts[(i+1)%640],dx=next.x-prev.x,dz=next.z-prev.z,l=Math.hypot(dx,dz)||1;return {x:p.x-dz/l*3.9*side,z:p.z+dx/l*3.9*side};});for(let i=1;i<edge.length;i++){if(E.explorationAt(edge[i].x,edge[i].z).distance<1||(side===1&&E.EXPLORATION_ROUTES.some(r=>{const a=Math.atan2(edge[i].x,E.WORLD.centerZ-edge[i].z);return a>r.angle-.13&&a<r.angle+.04;})))continue;roadMarks.push(ribbon([edge[i-1],edge[i]],.075,0xdedbd0,.106,null,false).geometry);}}
+for(const side of [-1,1]){const edge=roadPts.map((p,i)=>{const prev=roadPts[(i+639)%640],next=roadPts[(i+1)%640],dx=next.x-prev.x,dz=next.z-prev.z,l=Math.hypot(dx,dz)||1;return {x:p.x-dz/l*3.9*side,z:p.z+dx/l*3.9*side};});for(let i=1;i<edge.length;i++){if(cabinTurnoffOpening(edge[i].x,edge[i].z)||E.explorationAt(edge[i].x,edge[i].z).distance<1||(side===1&&E.EXPLORATION_ROUTES.some(r=>{const a=Math.atan2(edge[i].x,E.WORLD.centerZ-edge[i].z);return a>r.angle-.13&&a<r.angle+.04;})))continue;roadMarks.push(ribbon([edge[i-1],edge[i]],.075,0xdedbd0,.106,null,false).geometry);}}
 
 const centerLine=new THREE.Mesh(mergeGeometries(roadMarks),new THREE.MeshStandardMaterial({color:0xdedbd0,roughness:.9,side:THREE.DoubleSide}));centerLine.receiveShadow=true;scene.add(centerLine);roadMarks.forEach(g=>g.dispose());
 const yellowCenterLine=new THREE.Mesh(mergeGeometries(yellowMarks),new THREE.MeshStandardMaterial({color:0xe9b928,roughness:.9,side:THREE.DoubleSide}));yellowCenterLine.name='Yellow two-way centerline';yellowCenterLine.receiveShadow=true;scene.add(yellowCenterLine);yellowMarks.forEach(g=>g.dispose());
@@ -162,7 +162,7 @@ window.addEventListener('pagehide',()=>{cameraRig.dispose();engineExhaust.dispos
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderQuality.resize();});
 
 // Public read-only diagnostics; optional QA commands exist only with ?qa=1.
-window.cabinDiagnostics=()=>({environment:{...environmentMetrics},fullFrame:frameMetrics.snapshot(),quality:renderQuality.settings(),benchmarkView,cameraPosition:camera.position.toArray(),build:'large-lake-startup-landing',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},grass:{...forestGrass.userData.grass},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
+window.cabinDiagnostics=()=>({environment:{...environmentMetrics},fullFrame:frameMetrics.snapshot(),quality:renderQuality.settings(),benchmarkView,cameraPosition:camera.position.toArray(),build:'integrated-cabin-turnoff-2',performance:{samples:frameTimes.length,averageFPS:frameTimes.length?1000/(frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length):null,p95FrameMs:frameTimes.length?[...frameTimes].sort((a,b)=>a-b)[Math.floor(frameTimes.length*.95)]:null},forest:{...forest.userData.forest},grass:{...forestGrass.userData.grass},terrainTiles:ground.children.length,ready,state:{...state,events:[...state.events]},cameraMode:mode,renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles},model:!!jeep&&!!plane,webgl:renderer.capabilities.isWebGL2});
 if(new URLSearchParams(location.search).has('qa'))window.cabinQA={benchmark:name=>{
  if(!['jeep','lake','cabin','waterfall'].includes(name))throw new RangeError('Unknown benchmark view');
  clearInput();cameraRig.setEnabled(false);E.begin(state,name==='lake'?'plane':'jeep');benchmarkView=name;visual=0;lastEnvironmentRefresh=-Infinity;

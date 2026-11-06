@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {cabinApproachWidth} from './cabin-turnoff.js';
 import {roadPoint,TUNNEL,DRIVEWAY} from './engine.js';
 
 // Keep posts off the driving surface and face the approaching lane in both directions.
@@ -19,7 +20,7 @@ export function roadSignPlacements(){
   const p=roadPoint(s.angle),q=roadPoint(s.angle+.001),dx=q.x-p.x,dz=q.z-p.z,len=Math.hypot(dx,dz),tx=dx/len,tz=dz/len;
   return {...s,x:p.x-tz*7*s.direction,z:p.z+tx*7*s.direction,rotation:Math.atan2(-tx*s.direction,-tz*s.direction)};
  });
- return [...signs,turnoffStopPlacement(DRIVEWAY,'Cabin driveway')];
+ return [...signs,turnoffStopPlacement(DRIVEWAY,'Cabin driveway',cabinApproachWidth(12)/2)];
 }
 
 /** Path begins at the main road and travels into a destination. */

@@ -39,8 +39,8 @@ be patch-audited or claimed integrated. The supplied standalone quality module
 was independently implemented as 95b0990 with custom-shader map handling and
 measured full-frame diagnostics, preserving the Mac mini terrain/glazing.
 
-At this audit task-23 lake-exploration had uncommitted files and no new feature
-commit beyond the already integrated base/signs. It is pending, not included.
+At the initial audit task-23 lake-exploration was uncommitted. It subsequently
+completed as fabea7f and was integrated as 827670a, preserving berth and US signs.
 No other completed local Cabin feature/history artifacts were found missing.
 
 ## Pier and sign verification
@@ -55,3 +55,21 @@ location; departure from the new berth is separately tested.
 US sign materials. Existing localhost module caching initially showed old signs;
 versioned imports refresh changed modules instead of treating stale pixels as
 proof. Evidence: task-3/evidence/plane-berth-clearance.jpg and integrated-us-signs.jpg.
+
+## Exploration integration follow-up
+
+Source fabea7f -> 827670a. All 162 combined tests pass, including outbound/return
+driving for all three spurs, low-speed turning, tyre/terrain heights, finite
+scenery and discovery persistence. The main import map versions all changed
+shared modules consistently so existing Chrome tabs cannot mix old simulation
+with new terrain, foliage or minimap modules. Source evidence remains in task-23.
+Right-turn pockets are clockwise only; counterclockwise arrivals remain normal
+left turns. Mobile performance and a complete manual loop remain unmeasured.
+
+Chrome combined-build evidence: integrated-cove-junction.jpg shows the tapered lane and signs; integrated-cove-arrival.jpg shows a stopped vehicle at Cedar Cove and Lake stops 1 / 3. The live normal Cabin tab also shows vehicle, elapsed time, altitude/speed, mission panel and minimap; cabin-hud-current.jpg records the floatplane HUD. No missing Cabin HUD was reproduced.
+
+## Final requested cabin turnoff
+
+The main loop and cabin approach retain the identical asphalt material object. A 12 m paved mouth tapers smoothly to 4.5 m over 32 m with matched gravel shoulders, an opening in the road-edge stripe, and paved tyre classification. STOP post moves outside the widened pavement. Surface vertices follow tyre terrain height. Chrome rendered the combined turnoff with no captured errors and intact HUD. No new texture assets or shader effects added.
+
+Final combined validation: 165 tests pass, game syntax and diff checks pass. Chrome QA reports build integrated-cabin-turnoff-2, ready true, both models available, Balanced quality; captured console error list was empty. Final widened-apron screenshot: task-3/evidence/cabin-turnoff-review.jpg. A complete manual drive of the entire loop, mobile performance, and new matched performance benchmarking were not performed. Close foliage still visibly uses crossed cards; the current scene is not fully photorealistic. MacBook e2b5181 remains unavailable and unverified as detailed above.
