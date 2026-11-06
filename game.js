@@ -18,6 +18,7 @@ import {applyVehicleFidelity} from './vehicle-fidelity.js';
 import {createRoadSigns} from './road-signs.js';
 import {createForest} from './foliage.js';
 import {createForestGrass} from './forest-grass.js';
+import {createCabinGrounding} from './cabin-grounding.js';
 import {landscapeHeight,createLandscapeGeometry,createLandscapeTiles,createAsphaltMaps,createLakeDetails,createSandbar,createMountainTunnel,createParkingLot} from './environment.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -82,7 +83,7 @@ const centerLine=new THREE.Mesh(mergeGeometries(roadMarks),new THREE.MeshStandar
 const postG=new THREE.CylinderGeometry(.065,.08,1,5),postM=new THREE.MeshStandardMaterial({color:0xd7cbb0});const posts=new THREE.InstancedMesh(postG,postM,192);const dummy=new THREE.Object3D();
 for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),q=E.roadPoint(a+.0001),length=Math.hypot(q.x-p.x,q.z-p.z),x=p.x+6.3*(q.z-p.z)/length,z=p.z-6.3*(q.x-p.x)/length;dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
 // Detailed needle cards and real trunks arranged around the mountain road.
-const forest=createForest(landHeight,E.roadRadius);scene.add(forest,createRoadSigns(landHeight));
+const forest=createForest(landHeight,E.roadRadius);scene.add(forest,createRoadSigns(landHeight),createCabinGrounding(landHeight));
 const forestGrass=createForestGrass(forest.getTreeLocations(),landHeight,{density:matchMedia('(pointer: coarse)').matches?.5:1});scene.add(forestGrass);
 let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
 
