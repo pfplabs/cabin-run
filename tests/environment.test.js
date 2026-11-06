@@ -21,7 +21,7 @@ test('tunnel has an open driving passage, solid side walls, and a roof',()=>{
  }
  const a=(TUNNEL.startAngle+TUNNEL.endAngle)/2,p=roadPoint(a),center=new THREE.Vector3(p.x,p.y+1.1,p.z);
  const side=new THREE.Raycaster(center,new THREE.Vector3(Math.sin(a),0,-Math.cos(a)),.01,8).intersectObjects(meshes);
- assert.ok(side.length&&side[0].distance>4.5&&side[0].distance<5.2,'Side wall must be real geometry');
+ assert.ok(side.length&&side[0].distance>TUNNEL.innerHalfWidth-.3&&side[0].distance<TUNNEL.innerHalfWidth+.3,'Side wall must be real geometry');
  const roof=new THREE.Raycaster(center,new THREE.Vector3(0,1,0),.01,10).intersectObjects(meshes);
  assert.ok(roof.length&&roof[0].distance>5&&roof[0].distance<6,'Roof must cover the passage');
 });

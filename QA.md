@@ -2,11 +2,11 @@
 
 ## Expanded lake update: automated checks passed
 - `node --check` for `game.js`, `engine.js`, `environment.js`, `foliage.js`, `camera-rig.js` and the capture helper.
-- `npm test`: 46 deterministic tests (19 simulation, 11 camera input, 3 camera obstruction, 6 environment, 5 material and 2 flight-effect checks).
+- `npm test`: 55 deterministic tests (24 simulation, 11 camera input, 3 camera obstruction, 6 environment, 5 material, 2 flight-effect and 4 road/dust checks).
 - Simulation covers a complete winding road circuit through the tunnel, continuous road-to-driveway-to-cabin travel, launch-to-dock travel, reversing away from tunnel walls, elevated terrain, boundaries and bounded vehicle speeds. Lake area is verified as exactly four times the first version.
 - Camera tests cover both vehicle targets, mouse orbit and wheel zoom, touch orbit/pinch, concurrent driving touches, zoom limits, pause/resume and cleanup. These include trackpad horizontal/diagonal/vertical-tail events, pinch, heading wraparound and desired-camera retention through obstruction. They are simulated DOM tests, not physical-device tests.
 - Environment tests inspect upward-facing ground, an empty traversable tunnel volume with real walls and roof, sandbar position, connected parking and finite instanced shore geometry.
-- `node scripts/inspect-scene.mjs`: actual GLB parsing, 51 mesh primitives, 107,960 triangles, 30 materials, named JeepRoot / PlaneRoot / Propeller, finite vertices. Model source reopens in Blender 4.3.2.
+- `node scripts/inspect-scene.mjs`: actual GLB parsing, 50 mesh primitives, 132,684 triangles, 29 materials, named JeepRoot / PlaneRoot / Propeller, finite vertices. Model source reopens in Blender 4.3.2.
 - Main branch and the old prototype are preserved. No deployment has been performed.
 
 ## Previous iteration: Mac browser verified
@@ -31,3 +31,6 @@ QA-only setup: `cabinQA.start()`, `cabinQA.switchVehicle()`, `cabinQA.setMode('c
 
 ## Latest material pass
 Original packed procedural texture supplies granite weathering, strata, mineral grain, surface-normal detail and roughness. Terrain mixes grass, soil, wet/dry shore and slope rock; decorative boulders have welded smooth normals. CPU tests validate shader patch construction and geometry. Shader compilation and visual quality are NOT verified until a fresh Mac/browser pass. No new external assets were downloaded.
+
+## Jeep, driveway and cabin revision
+Jeep integration uses 120 Hz substeps, smoothed speed-sensitive steering, capped lateral grip and damped four-wheel suspension. Identical scripted runs at30/60/120fps agree within1e-8; a full-speed keyboard-following test completes the road/tunnel without collision. Normal/boost limits are22/28m/s. Asphalt widened to8.4m, tunnel opening10.8m. The former seven-station driveway ribbon was replaced with metre-spaced sections; raycasts across its usable width verify the actual road surface stays above the rendered land. Gravel dust is bounded, speed-dependent and absent on asphalt. The larger cabin foundation, collision bounds, flight clearance and foliage exclusion are aligned. These are automated checks; updated visual feel, dust and architecture still require Mac browser inspection.

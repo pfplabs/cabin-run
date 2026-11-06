@@ -57,7 +57,7 @@ export function createForest(heightAt,roadRadius){
     if(Math.abs(roadOffset(x,z))<14||lakeRadius(x,z)<1.075)return false;
     const angle=Math.atan2(x,WORLD.centerZ-z);if(angle>TUNNEL.startAngle-.04&&angle<TUNNEL.endAngle+.04&&Math.abs(roadOffset(x,z))<29)return false;
     // Cabin, terrace and apron remain clear. No stand blocks the access lane.
-    if(x>-14&&x<31&&z>-29&&z<12)return false;
+    if(x>-14&&x<34&&z>-34&&z<12)return false;
     if(DRIVEWAY.some((a,i)=>i&&segmentDistance(x,z,DRIVEWAY[i-1],a)<7.5))return false;
     if(!Number.isFinite(heightAt(x,z))||heightAt(x,z)<.1)return false;
     const gx=Math.floor(x/spacing),gz=Math.floor(z/spacing),key=`${spacing}:${gx}:${gz}`;
@@ -65,7 +65,7 @@ export function createForest(heightAt,roadRadius){
   }
   const near=[],far=[];
   function add(list,x,z,hero=false){if(!valid(x,z,hero?2.8:4))return;list.push({x,z,h:hero?7+random()*10:9+random()*15,w:.76+random()*.45,angle:random()*Math.PI*2,tint:random(),lean:(random()-.5)*.035});}
-  // Irregular small groves behind the unchanged hero cabin, away from driveway.
+  // Irregular small groves behind the enlarged cabin, away from driveway.
   const groves=[[-4,-40],[21,-43],[37,-33],[-31,-29],[48,-46]];
   for(let i=0;i<1200&&near.length<95;i++){
     const [x,z]=groves[i%groves.length],a=random()*Math.PI*2,r=Math.sqrt(random())*11;

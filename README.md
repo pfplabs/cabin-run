@@ -1,6 +1,6 @@
 # Northbound — Cabin Run 3D
 
-A real-time Three.js alpine-lake driving and floatplane sandbox, reconstructed from the supplied cabin artwork. The cabin, dock, canoe, jeep, yellow floatplane and Icelandic flag are actual Blender meshes. No original model files were required.
+A real-time Three.js alpine-lake driving and floatplane sandbox, reconstructed from the supplied cabin artwork. The cabin, dock, canoe, jeep, yellow floatplane and Icelandic flag are actual Blender meshes. No original model files were required. The rebuilt cabin now has a larger, approximately 493 m² footprint, with human-scaled doors/stairs, a full-width balcony, wraparound living-room glazing and a furnished interior.
 
 This branch replaces the old 2D prototype at the root. The original prototype is preserved under `legacy-2d/`; `main` is unchanged. Nothing has been deployed.
 
@@ -17,7 +17,7 @@ python3 -m http.server 4173
 
 ## Explore
 
-- Jeep: W/S or arrows for throttle and reverse, A/D or arrows to steer, Shift to accelerate, Control to brake.
+- Jeep: W/S or arrows for throttle and reverse, A/D or arrows to steer, Shift for the higher speed range, Control to brake. Normal speed reaches 79 km/h, or 101 km/h with Shift. Steering, grip, acceleration and suspension are smoothed; slow for corners.
 - Floatplane starts idling on the water. Hold Shift to raise throttle, then W to lift off once moving. Control lowers throttle; release holds the chosen power. A/D banks and steers, W/S changes pitch smoothly. The HUD shows throttle, airspeed and engine RPM.
 - V switches between the jeep road start and floatplane lake start. This is a convenient scene selector, not an in-world boarding interaction.
 - Space parks near the house, moors the plane near the dock below 47 km/h, or releases it from its mooring. After release, throttle up and lift off again.
@@ -26,7 +26,7 @@ python3 -m http.server 4173
 - On-screen multi-touch driving/flight controls are provided for small/coarse-pointer screens.
 - Sound is opt-in. No accounts, analytics, tracking, remote assets or gameplay network calls. Texture credits are linked in the scene and documented in `assets/pbr/SOURCES.md`.
 
-The expanded lake has four times the original surface area (312 × 228 metres across). A winding, roughly 1.2 km road climbs the rocky ridge, passes through a genuine open-ended tunnel, and descends around the lake. A separate gravel driveway reaches three usable parking bays beside the cabin. A sandy bar and reeds soften the rocky shoreline. The world is bounded by the valley; flight has an 84 m altitude ceiling. A translucent edge appears near the flight limit. Leaving it shows an eight-second return countdown; manual return is allowed before a gentle steering assist engages. There are no crates, rings, races or imposed objectives.
+The expanded lake has four times the original surface area (312 × 228 metres across). A winding, roughly 1.2 km road climbs the rocky ridge, passes through a genuine open-ended tunnel, and descends around the lake. The asphalt is 8.4 m wide, with contrasting textured gravel shoulders that produce tyre dust. A densely sampled gravel driveway follows the ground to three usable parking bays beside the enlarged timber cabin. A sandy bar and reeds soften the rocky shoreline. The world is bounded by the valley; flight has an 84 m altitude ceiling. A translucent edge appears near the flight limit. Leaving it shows an eight-second return countdown; manual return is allowed before a gentle steering assist engages. There are no crates, rings, races or imposed objectives.
 
 ## Rebuild the Blender assets
 
@@ -46,7 +46,7 @@ npm test
 node scripts/inspect-scene.mjs
 ```
 
-The 46 Node tests cover driving, flight, boundaries, collision, pause/resume/restart, vehicle switching, a complete winding road circuit through the tunnel, continuous input-driven trips to the cabin and dock, camera gestures, terrain mesh normals and tunnel geometry. Scene validation parses the real GLB with Three.js, checks named vehicle roots, finite geometry and triangle/draw-call budgets.
+The 55 Node tests cover driving, flight, boundaries, collision, pause/resume/restart, vehicle switching, a complete winding road circuit through the tunnel, continuous input-driven trips to the cabin and dock, camera gestures, terrain mesh normals and tunnel geometry. Scene validation parses the real GLB with Three.js, checks named vehicle roots, finite geometry and triangle/draw-call budgets.
 
 `?qa=1` enables `window.cabinQA` for deterministic test setup. `window.cabinDiagnostics()` is read-only and reports scene/renderer/simulation details. Normal play does not expose state-changing debug controls.
 

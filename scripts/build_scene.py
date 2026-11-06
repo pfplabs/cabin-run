@@ -119,99 +119,191 @@ for i,((ax,az),(bx,bz)) in enumerate(paths):
     mesh('Gravel track '+str(i),[(ax+ox,height(ax,az)+.035,az+oz),(bx+ox,height(bx,bz)+.035,bz+oz),(bx-ox,height(bx,bz)+.035,bz-oz),(ax-ox,height(ax,az)+.035,az-oz)],[(0,1,2,3)],M['path'])
 
 print('Road ready', flush=True)
-# Two-story log cabin, floor area 20 x 12 m, front faces the lake (+Z).
-cx,cz=8,-13
-box('Cabin stone foundation',(cx,1.1,cz),(21,.7,13),M['stone'])
-box('Cabin inner wall shadow',(cx,4.2,cz),(20,5.8,12),M['interior'])
-for j in range(13):
-    y=1.65+j*.42;m=M['cedar'] if j%2 else M['lightwood']
-    # Front sections leave a door, panoramic window and glazed corner.
-    for a,b in [(-2,0),(2.2,3.7),(9.2,10.6)]:
-        if 2<y<4.5: beam('Front log',(a,y,-6.9),(b,y,-6.9),.25,m,vertices=10)
-    if y<=2 or y>=4.5: beam('Front full log',(-2.4,y,-6.9),(18.4,y,-6.9),.25,m,vertices=10)
-    beam('Back log',(-2.4,y,-19.1),(18.4,y,-19.1),.25,m,vertices=10)
-    beam('Left log',(-2.1,y,-19.4),(-2.1,y,-6.6),.25,m,vertices=10)
-    if y>4.5 or y<2: beam('Right log',(18.1,y,-19.4),(18.1,y,-6.6),.25,m,vertices=10)
-    else: beam('Right rear log',(18.1,y,-19.4),(18.1,y,-12.7),.25,m,vertices=10)
-box('Door frame',(1.05,3.05,-6.62),(2.4,3.25,.22),M['black'])
-box('Diagonal cedar door',(1.05,3.05,-6.45),(1.9,2.95,.12),M['lightwood'])
-for y in [1.9,2.35,2.8,3.25,3.7,4.15]: beam('Door slat',(0.1,y,-6.34),(1.95,y+.4,-6.34),.022,M['deck'],vertices=6)
-ellipsoid('Door handle',(1.73,3.1,-6.24),(.06,.06,.09),M['silver'])
-box('Panorama window frame',(6.4,3.32,-6.55),(5.8,2.05,.18),M['black'])
-box('Panorama glass',(6.4,3.32,-6.4),(5.5,1.78,.05),M['glass'])
-box('Front glass bay',(14.3,3.15,-6.72),(7.2,3.9,.06),M['glass'])
-box('Side glass bay',(18.2,3.15,-9.8),(.06,3.9,6.3),M['glass'])
-for x in [10.7,14.3,18.0]:box('Front glass mullion',(x,3.15,-6.58),(.10,4,.12),M['black'])
-for z in [-6.8,-9.8,-12.8]:box('Side glass mullion',(18.23,3.15,z),(.1,4,.1),M['black'])
-box('Glass top frame',(14.4,5.12,-6.6),(7.4,.1,.1),M['black'])
-box('Interior floor',(13.9,1.55,-9.5),(7.5,.15,5.8),M['lightwood'])
-box('Cabin sofa',(13.6,2,-10.8),(3,.7,1.15),M['white'],.15)
-box('Sofa back',(13.6,2.55,-11.25),(3,.8,.28),M['white'],.1)
-box('Coffee table',(13.6,2.03,-8.7),(2,.14,.9),M['deck'])
-for x in [12.8,14.4]:beam('Table leg',(x,1.6,-8.7),(x,2,-8.7),.055,M['black'])
-# Main pitched roof and cedar gable.
-mesh('Cedar gable',[(-2.5,7,-19.5),(18.5,7,-19.5),(8,11,-19.5),(-2.5,7,-6.5),(18.5,7,-6.5),(8,11,-6.5)],[(0,1,2),(3,5,4)],M['cedar'])
-for x1,x2 in [(-4,8),(8,20)]:
-    y1=11.2-abs(x1-8)*.35;y2=11.2-abs(x2-8)*.35
-    mesh('Charcoal roof panel',[(x1,y1,-21),(x2,y2,-21),(x2,y2,-4.8),(x1,y1,-4.8)],[(0,1,2,3),(3,2,1,0)],M['roof'])
-    beam('Roof cedar edge',(x1,y1,-4.8),(x2,y2,-4.8),.18,M['lightwood'])
-    for z in range(-21,-4):beam('Roof standing seam',(x1,y1+.03,z),(x2,y2+.03,z),.035,M['black'],vertices=4)
-# Front balcony immediately below the gable.
-box('Upper terrace',(8,6.98,-5.7),(21.6,.22,2.5),M['deck'])
-for x in [i-2.5 for i in range(22)]:
-    box('Balcony baluster',(x,7.6,-4.48),(.09,1.3,.09),M['black'])
-    if int(x+.5)%2==0:
-        beam('Balcony diagonal',(x-.36,7.5,-4.45),(x,7.82,-4.45),.034,M['red'],vertices=6)
-        beam('Balcony diagonal',(x,7.82,-4.45),(x+.36,7.5,-4.45),.034,M['red'],vertices=6)
-box('Balcony rail',(8,8.3,-4.48),(21.8,.12,.15),M['lightwood'])
-box('Balcony lower rail',(8,7.2,-4.48),(21.8,.12,.12),M['black'])
-box('Stone chimney',(0,9,-16),(1.6,5,1.4),M['stoneLight'])
-box('Chimney cap',(0,11.6,-16),(2,.2,1.8),M['black'])
-# Lower deck and steps.
-for x in [i*.38-3 for i in range(39)]:box('Porch plank',(x,1.8,-4.6),(.35,.15,3.8),M['deck'])
-for x in [-3,2,7,11.5]:beam('Porch post',(x,.9,-2.75),(x,3.1,-2.75),.075,M['lightwood'])
-for x in [i*.3-3 for i in range(49)]:
-    if -.1<x<2.4:continue
-    box('Porch baluster',(x,2.5,-2.75),(.06,1.15,.06),M['lightwood'])
-for a,b in [(-3,-.15),(2.4,11.5)]:box('Porch handrail',((a+b)/2,3.12,-2.75),(b-a,.14,.16),M['cedar'])
-for i in range(4):box('Porch stair',(1.1,1.65-i*.22,-2.3+i*.48),(2.6,.2,.56),M['deck'])
-
-# Architectural details: gutter/downpipes, recessed warm lamps, mortar courses,
-# usable interior furniture. Geometry remains batched by material at export.
+# Enlarged timber lodge. The enlargement is in usable floor area, not the scale
+# of doors, furniture, vehicles or the surrounding landscape. Browser meters.
+X0,X1,Z0,Z1=-2.4,23.4,-26,-6.9
+CX=(X0+X1)/2;FLOOR=1.65;UPPER=4.95;EAVE=7.7;RIDGE=11.7
 M['lamp']=mat('Warm lamp diffuser',(1,.72,.36),.3)
 M['lamp'].node_tree.nodes.get('Principled BSDF').inputs['Emission Color'].default_value=(1,.55,.18,1)
 M['lamp'].node_tree.nodes.get('Principled BSDF').inputs['Emission Strength'].default_value=2
 M['fabric']=mat('Woven oatmeal upholstery',(.43,.39,.31),.92)
 M['mortar']=mat('Stone mortar',(.20,.21,.19),.95)
-for x in [-3.95,19.95]:
-    beam('Rain gutter',(x,6.96,-21),(x,6.96,-4.8),.11,M['black'])
-    beam('Downpipe elbow',(x,6.96,-19.8),(x+(.8 if x<0 else -.8),6.5,-19.8),.075,M['black'])
-    px=x+(.8 if x<0 else -.8)
-    beam('Downpipe',(px,6.5,-19.8),(px,1.1,-19.8),.075,M['black'])
-    for y in [2,4,6]:box('Downpipe clip',(px,y,-19.8),(.19,.055,.19),M['silver'])
-for x in [-.6,10.1]:
-    box('Porch sconce backplate',(x,3.8,-6.32),(.28,.55,.08),M['black'],.035)
-    box('Warm sconce glass',(x,3.8,-6.17),(.22,.37,.21),M['lamp'],.025)
-    for y in [3.57,4.03]:box('Sconce cap',(x,y,-6.17),(.33,.065,.3),M['black'],.025)
-    for dx in [-.13,.13]:beam('Sconce cage',(x+dx,3.58,-6.04),(x+dx,4.03,-6.04),.018,M['black'])
-for y in [7+i*.38 for i in range(12)]:
-    box('Chimney mortar front',(0,y,-15.29),(1.6,.025,.012),M['mortar'])
-    box('Chimney mortar side',(.81,y,-16),(.012,.025,1.4),M['mortar'])
-for x in [-.55,.55]:beam('Chimney cap riser',(x,11.65,-16),(x,12.1,-16),.055,M['black'])
-box('Raised chimney weather hood',(0,12.15,-16),(2.1,.13,1.9),M['black'],.04)
-for x in [12.6,13.6,14.6]:box('Sofa seat cushion',(x,2.42,-10.65),(.92,.18,.91),M['fabric'],.08)
-for x in [12.2,15]:box('Sofa arm',(x,2.4,-10.8),(.25,.65,1.2),M['fabric'],.08)
-box('Interior woven rug',(13.8,1.65,-9.2),(4.5,.025,3.3),M['fabric'])
-box('Dining tabletop',(16.5,2.45,-11.7),(1.9,.15,1.3),M['lightwood'],.04)
-for x in [15.8,17.2]:
-    for z in [-12.15,-11.25]:beam('Dining table leg',(x,1.6,z),(x,2.42,z),.045,M['black'])
-for x in [15.2,17.8]:
-    box('Dining chair seat',(x,2,-11.7),(.55,.11,.62),M['fabric'],.04)
-    box('Dining chair back',(x,2.45,-12),(.55,.75,.10),M['lightwood'],.04)
-    for dx in [-.22,.22]:
-        for dz in [-.23,.23]:beam('Dining chair leg',(x+dx,1.6,-11.7+dz),(x+dx,2,-11.7+dz),.025,M['black'])
-box('Book on table',(13.3,2.14,-8.65),(.45,.08,.30),M['white'],.01)
-beam('Coffee cup',(14.1,2.1,-8.65),(14.1,2.28,-8.65),.08,M['white'],vertices=20)
+box('Cabin granite plinth',(CX,1.21,(Z0+Z1)/2),(26.6,.88,19.9),M['stone'],.055)
+box('Ground floor deck',(CX,1.59,(Z0+Z1)/2),(25.5,.12,18.8),M['deck'])
+# Upper slab has a real stairwell rather than a staircase intersecting a solid floor.
+for a,b in [(-2.25,8.8),(11.2,23.25)]:box('Upper floor structure',((a+b)/2,4.85,-16.45),(b-a,.2,18.8),M['deck'])
+for a,b in [(-25.85,-19),(-13,-7.05)]:box('Upper central floor',(10,4.85,(a+b)/2),(2.4,.2,b-a),M['deck'])
+for i in range(18):
+    y=1.65+(i+1)*3.3/18;z=-13.5-i*.28
+    box('Interior stair tread',(10,y-.045,z),(1.2,.09,.30),M['lightwood'],.012)
+for x in [9.36,10.64]:
+    beam('Interior stair stringer',(x,1.64,-13.35),(x,4.81,-18.4),.07,M['black'],vertices=4)
+    beam('Interior stair handrail',(x,2.65,-13.35),(x,5.85,-18.4),.028,M['black'])
+box('Stair upper landing',(10,4.88,-18.7),(2.4,.14,.8),M['deck'])
+for x in [8.8,11.2]:
+    box('Stairwell handrail',(x,6,-16),(.055,.055,6),M['black'])
+    for j in range(13):box('Stairwell baluster',(x,5.48,-19+j*.5),(.035,1.05,.035),M['black'])
+# No solid shadow cuboid: real rear walls and partitions provide depth through glass.
+for j in range(18):
+    y=1.83+j*.33
+    # Squared, softly eased heavy timbers. Regular 33 cm courses remain human-scaled.
+    intervals=[(X0,X1)]
+    if y<4.04: intervals=[(X0,.57),(1.83,4.65),(10.65,11.95)] if y>2.25 else [(X0,.57),(1.83,11.95)]
+    elif y<4.75: intervals=[(X0,11.95)]
+    elif 4.99<y<7.35: intervals=[(X0,-.1),(6.9,8.4),(12.6,15.6),(21.5,X1)] if y>5.35 else [(X0,8.4),(12.6,X1)]
+    for a,b in intervals:box('Front squared timber',((a+b)/2,y,Z1),(b-a,.31,.33),M['cedar'],.025)
+    box('Rear squared timber',(CX,y,Z0),(26.05,.31,.33),M['cedar'],.025)
+    # Recessed west windows, not glass laid over opaque walls.
+    west=[(Z0,Z1)] if not 2.35<y<4.1 else [(Z0,-22),(-18,-15),(-11,Z1)]
+    for a,b in west:box('West squared timber',(X0,y,(a+b)/2),(.33,.31,b-a),M['cedar'],.025)
+    east=[(Z0,Z1)] if y>=4.75 else [(Z0,-14.1)]
+    for a,b in east:box('East squared timber',(X1,y,(a+b)/2),(.33,.31,b-a),M['cedar'],.025)
+# Exposed corner joinery and continuous floor headers.
+for x in [X0,X1]:
+    for z in [Z0,Z1]:box('Corner timber post',(x,4.55,z),(.39,5.8,.39),M['lightwood'],.035)
+for y in [1.72,4.65,7.50]:
+    box('Front timber header',(CX,y,-6.67),(26.2,.20,.28),M['lightwood'],.025)
+    box('East timber header',(23.58,y,-16.4),(.25,.20,19.4),M['lightwood'],.025)
+# Main entry: 1.05 m clear leaf, 2.35 m tall. Real jambs, sill, lever and glazing.
+for x in [.59,1.81]:box('Entry jamb',(x,2.88,-6.65),(.13,2.55,.27),M['black'],.015)
+box('Entry lintel',(1.2,4.14,-6.65),(1.35,.15,.27),M['black'],.015)
+box('Entry cedar leaf',(1.2,2.825,-6.60),(1.05,2.35,.12),M['lightwood'],.025)
+for y in [1.85+i*.18 for i in range(12)]:
+    beam('Diagonal entry detailing',(.70,y,-6.52),(1.70,y+.2,-6.52),.012,M['deck'],vertices=6)
+box('Entry threshold',(1.2,1.69,-6.52),(1.35,.07,.42),M['stoneLight'])
+beam('Entry pull',(1.60,2.55,-6.46),(1.60,2.91,-6.46),.025,M['black'],vertices=12)
+
+def front_window(name,a,b,y0,y1,z=-6.67,divisions=2):
+    box(name+' glazing',((a+b)/2,(y0+y1)/2,z),(b-a,y1-y0,.045),M['glass'])
+    for x in [a+(b-a)*i/divisions for i in range(divisions+1)]:box(name+' vertical frame',(x,(y0+y1)/2,z+.05),(.075,y1-y0+.12,.11),M['black'])
+    for y in [y0,y1]:box(name+' horizontal frame',((a+b)/2,y,z+.05),(b-a+.12,.075,.11),M['black'])
+    box(name+' timber sill',((a+b)/2,y0-.08,z+.10),(b-a+.25,.12,.3),M['lightwood'],.015)
+front_window('Panorama window',4.70,10.60,2.30,4.04,divisions=3)
+front_window('Corner living room',12.02,23.36,1.83,4.62,divisions=4)
+front_window('Upper west bedroom',-.03,6.83,5.35,7.32,divisions=3)
+front_window('Balcony French doors',8.46,12.54,5.04,7.32,divisions=4)
+front_window('Upper east bedroom',15.66,21.44,5.35,7.32,divisions=3)
+for z in [-22,-18,-15,-11]:
+    if z in [-22,-15]:
+        box('West bedroom glazing',(-2.59,3.22,z+2),(.045,1.7,3.9),M['glass'])
+        for zz in [z,z+2,z+4]:box('West window mullion',(-2.62,3.22,zz),(.11,1.85,.075),M['black'])
+        for y in [2.35,4.1]:box('West window head sill',(-2.62,y,z+2),(.15,.09,4.1),M['black'])
+for z in [-6.95,-9.30,-11.65,-14.02]:box('East glazed wall mullion',(23.57,3.22,z),(.11,2.88,.09),M['black'])
+box('East living glass',(23.52,3.22,-10.49),(.045,2.78,7.1),M['glass'])
+for y in [1.83,4.62]:box('East glazed wall head sill',(23.58,y,-10.49),(.11,.09,7.2),M['black'])
+# Broad gable with layered horizontal cedar boards, roof fascia and deep soffits.
+for z in [Z0-.12,Z1+.02]:
+    mesh('Gable cedar backing',[(X0,EAVE-.2,z),(X1,EAVE-.2,z),(CX,RIDGE-.14,z)],[(0,1,2),(2,1,0)],M['cedar'])
+    for j in range(13):
+        y=EAVE+j*.33;lo=y-.155;hi=min(y+.155,RIDGE-.14)
+        if hi<=lo:continue
+        # Clip every board end to the underside of the roof; rectangular ends
+        # otherwise protrude through the sloping metal skin as visible teeth.
+        w0=min(12.9,max(0,(RIDGE-.14-lo)*12.9/4));w1=min(12.9,max(0,(RIDGE-.14-hi)*12.9/4))
+        verts=[(CX-w0,lo,z-.1),(CX+w0,lo,z-.1),(CX+w1,hi,z-.1),(CX-w1,hi,z-.1),(CX-w0,lo,z+.1),(CX+w0,lo,z+.1),(CX+w1,hi,z+.1),(CX-w1,hi,z+.1)]
+        mesh('Clipped gable cedar board',verts,[(0,3,2,1),(4,5,6,7),(0,1,5,4),(3,7,6,2),(0,4,7,3),(1,2,6,5)],M['cedar'])
+for x1,x2 in [(-4,CX),(CX,25)]:
+    def roof_y(x):return RIDGE-abs(x-CX)*(4/12.9)
+    y1,y2=roof_y(x1),roof_y(x2)
+    mesh('Standing seam roof skin',[(x1,y1,-27.5),(x2,y2,-27.5),(x2,y2,-4.4),(x1,y1,-4.4)],[(0,1,2,3),(3,2,1,0)],M['roof'])
+    for z in [-27.5,-4.4]:
+        beam('Roof solid timber fascia',(x1,y1-.08,z),(x2,y2-.08,z),.14,M['lightwood'],vertices=4)
+        beam('Roof drip edge',(x1,y1+.025,z),(x2,y2+.025,z),.035,M['black'],vertices=4)
+    for i in range(43):
+        z=-27.5+i*.55;beam('Roof standing seam',(x1,y1+.04,z),(x2,y2+.04,z),.025,M['black'],vertices=4)
+    # Warm shadow under the overhang rather than a paper-thin roof edge.
+    mesh('Cedar roof soffit',[(x1,y1-.12,-27.5),(x2,y2-.12,-27.5),(x2,y2-.12,-4.4),(x1,y1-.12,-4.4)],[(3,2,1,0)],M['deck'])
+beam('Ridge flashing',(CX,11.75,-27.55),(CX,11.75,-4.35),.09,M['black'],vertices=6)
+for x in [-3.95,24.95]:
+    y=RIDGE-abs(x-CX)*4/12.9
+    beam('Rain gutter',(x,y-.08,-27.5),(x,y-.08,-4.4),.10,M['black'])
+    px=x+(.9 if x<0 else -.9)
+    beam('Gutter outlet',(x,y-.08,-25.5),(px,y-.5,-25.5),.07,M['black'])
+    beam('Downpipe',(px,y-.5,-25.5),(px,1,-25.5),.07,M['black'])
+    for yy in [2,4,6]:box('Downpipe bracket',(px,yy,-25.5),(.18,.055,.18),M['silver'])
+# Upper balcony spans the lake facade. Human-height balustrade and diamond inlays.
+box('Upper balcony edge',(CX,4.86,-5.47),(26.8,.20,2.7),M['deck'])
+for i in range(82):box('Balcony deck board',(-2.75+i*.33,4.985,-5.47),(.31,.06,2.7),M['deck'])
+for i in range(28):
+    x=-2.75+i*.98
+    box('Upper balcony post',(x,5.51,-4.10),(.065,1.10,.065),M['black'])
+    if i<27:
+        c=x+.49
+        for a,b in [((c-.13,5.52,-4.1),(c,5.69,-4.1)),((c,5.69,-4.1),(c+.13,5.52,-4.1)),((c+.13,5.52,-4.1),(c,5.35,-4.1)),((c,5.35,-4.1),(c-.13,5.52,-4.1))]:beam('Copper diamond inset',a,b,.018,M['red'],vertices=6)
+for y in [5.07,5.33]:box('Upper balcony lower rail',(CX,y,-4.1),(27.1,.045,.065),M['black'])
+box('Upper balcony cedar handrail',(CX,6.07,-4.1),(27.1,.09,.13),M['lightwood'],.015)
+for x in [-2.75,23.75]:
+    box('Balcony return rail',(x,6.07,-5.45),(.13,.09,2.7),M['lightwood'])
+    for z in [-6.6,-5.8,-5.0]:box('Balcony return baluster',(x,5.52,z),(.065,1.1,.065),M['black'])
+# Lower veranda and a separate, ordinary-size stair approach.
+for i in range(169):box('Veranda plank',(-2.95+i*.16,1.58,-4.5),(.15,.14,4),M['deck'])
+for x in [-2.8,5.3,12.0,23.7]:
+    box('Veranda support',(x,3.23,-4.22),(.20,3.14,.20),M['lightwood'],.025)
+    box('Post footing',(x,1.5,-4.22),(.32,.20,.32),M['stoneLight'],.025)
+for a,b in [(-3,.3),(2.1,12.0)]:
+    box('Veranda handrail',((a+b)/2,2.68,-2.5),(b-a,.10,.14),M['lightwood'],.018)
+    box('Veranda bottom rail',((a+b)/2,1.83,-2.5),(b-a,.06,.06),M['black'])
+    for i in range(int((b-a)/.18)+1):box('Veranda baluster',(a+i*.18,2.23,-2.5),(.035,.85,.035),M['black'])
+for i in range(4):
+    # 20 cm risers / 40 cm treads. Top deck1.65, bottom tread1.05.
+    box('Entry stair tread',(1.2,1.58-i*.20,-2.70+i*.40),(1.8,.14,.42),M['deck'],.015)
+for x in [.30,2.10]:
+    beam('Entry stair stringer',(x,.88,-1.35),(x,1.48,-2.55),.075,M['deck'],vertices=4)
+    beam('Entry stair handrail',(x,1.95,-1.35),(x,2.55,-2.55),.045,M['lightwood'])
+    for z,y in [(-1.35,1.5),(-2.55,2.0)]:box('Stair rail post',(x,y,z),(.075,1.0,.075),M['black'])
+# Tall stone chimney, staggered courses, flashing and an open-sided weather hood.
+box('Granite chimney',(1.6,8.4,-20),(1.75,8.2,1.55),M['stoneLight'],.035)
+for j in range(20):
+    y=4.45+j*.39
+    box('Chimney mortar bed',(1.6,y,-19.218),(1.75,.018,.015),M['mortar'])
+    box('Chimney side mortar',(2.482,y,-20),(.015,.018,1.55),M['mortar'])
+    for x in [1.18+(j%2)*.35,1.95+(j%2)*.25]:box('Chimney vertical joint',(x,y+.19,-19.216),(.018,.36,.016),M['mortar'])
+box('Chimney lower cap',(1.6,12.54,-20),(2.05,.15,1.85),M['black'],.025)
+for x in [1.0,2.2]:beam('Chimney hood support',(x,12.6,-20),(x,12.88,-20),.04,M['black'])
+box('Chimney rain hood',(1.6,12.94,-20),(2.2,.12,2),M['black'],.025)
+# Interior seen through the wraparound glass: lounge, dining and rear kitchen.
+box('Living room rug',(17.5,1.67,-9.6),(6.0,.025,4.4),M['fabric'])
+box('Sofa base',(16.7,2.0,-11.1),(3.2,.55,1.05),M['fabric'],.10)
+box('Sofa back',(16.7,2.42,-11.55),(3.2,.75,.22),M['fabric'],.08)
+for x in [15.62,16.7,17.78]:box('Sofa cushion',(x,2.29,-11.02),(1.01,.16,.85),M['fabric'],.07)
+for x in [15.18,18.22]:box('Sofa arm',(x,2.25,-11.1),(.22,.65,1.08),M['fabric'],.07)
+box('Lounge table',(17.0,2.07,-8.7),(1.65,.12,.8),M['lightwood'],.035)
+for x in [16.35,17.65]:
+    for z in [-8.95,-8.45]:beam('Lounge table leg',(x,1.68,z),(x,2.01,z),.025,M['black'])
+box('Book on lounge table',(16.7,2.17,-8.7),(.35,.07,.24),M['white'],.01)
+beam('Coffee cup',(17.35,2.13,-8.7),(17.35,2.28,-8.7),.065,M['white'],vertices=20)
+box('Dining table',(20.8,2.40,-11.8),(1.4,.12,2.4),M['lightwood'],.035)
+for x in [20.25,21.35]:
+    for z in [-12.8,-10.8]:beam('Dining table leg',(x,1.65,z),(x,2.34,z),.035,M['black'])
+for x in [19.65,21.95]:
+    for z in [-12.5,-11.1]:
+        box('Dining chair seat',(x,2.08,z),(.48,.10,.48),M['fabric'],.035)
+        box('Dining chair back',(x+( -.22 if x<21 else .22),2.4,z),(.08,.62,.48),M['lightwood'],.025)
+        for dx in [-.18,.18]:
+            for dz in [-.18,.18]:beam('Dining chair leg',(x+dx,1.65,z+dz),(x+dx,2.04,z+dz),.02,M['black'],vertices=8)
+box('Kitchen rear partition',(17.8,3.1,-15.8),(10.3,2.9,.16),M['lightwood'])
+box('Kitchen base cabinetry',(18.6,2.1,-15.1),(6.4,.9,.65),M['deck'],.025)
+box('Kitchen stone counter',(18.6,2.59,-15.1),(6.55,.08,.72),M['stoneLight'],.015)
+for x in [16,17.1,18.2,19.3,20.4,21.5]:
+    box('Kitchen cabinet face',(x,2.12,-14.75),(1.04,.79,.04),M['lightwood'],.015)
+    beam('Cabinet pull',(x-.15,2.37,-14.70),(x+.15,2.37,-14.70),.012,M['black'],vertices=8)
+box('Kitchen sink',(18.3,2.64,-15.1),(.65,.035,.45),M['silver'],.05)
+beam('Kitchen tap',(18.3,2.65,-15.35),(18.3,2.95,-15.35),.022,M['silver'])
+beam('Kitchen tap spout',(18.3,2.95,-15.35),(18.3,2.95,-15.12),.022,M['silver'])
+# Lanterns and suspended interior lights are fixtures, not oversized bright blobs.
+for x in [-.35,11.30,23.55]:
+    box('Porch sconce plate',(x,3.6,-6.46),(.20,.35,.06),M['black'],.015)
+    box('Warm sconce glass',(x,3.6,-6.35),(.14,.25,.16),M['lamp'],.015)
+    for y in [3.44,3.76]:box('Sconce hood',(x,y,-6.35),(.23,.045,.22),M['black'],.015)
+for z in [-12.5,-11.1]:
+    beam('Pendant cable',(20.8,4.75,z),(20.8,3.5,z),.008,M['black'],vertices=6)
+    ellipsoid('Pendant shade',(20.8,3.45,z),(.20,.09,.20),M['black'])
+    ellipsoid('Pendant warm lens',(20.8,3.4,z),(.16,.025,.16),M['lamp'])
+# Broad rear/side additions feel inhabited without changing vehicle scale.
+for x,z in [(22.4,-8.0),(12.7,-6.0)]:
+    box('Veranda planter',(x,1.94,z),(.55,.58,.55),M['deck'],.03)
+    for dx,dz in [(-.12,0),(.1,.1),(0,-.13)]:beam('Planter foliage',(x+dx,2.2,z+dz),(x+dx*.8,2.85,z+dz*.8),.065,M['pine'],vertices=6)
+print('CABIN_ENVELOPE',{'foundation':[-2.8,23.8,-26.4,-6.5],'veranda':[-3,24,-6.5,-2.5],'ridge':11.79,'highest':13.0,'floor':1.65,'upper':4.95},flush=True)
 
 print('Cabin ready', flush=True)
 # Jetty is a real planked structure on stilts.

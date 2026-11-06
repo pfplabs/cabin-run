@@ -10,14 +10,18 @@ test('ready and paused states do not simulate; resume preserves position',()=>{
  E.begin(s);step(s,{up:true},.4);E.togglePause(s);const paused=structuredClone(s);step(s,{up:true},2);assert.deepEqual(s,paused);
  assert.equal(E.action(s),false);E.togglePause(s);step(s,{up:true},.1);assert.notEqual(s.x,paused.x);
 });
-test('jeep accelerates, brakes, reverses and steers in both directions',()=>{
- const s=running();step(s,{up:true},.5);assert.ok(s.speed>4);const speed=s.speed;step(s,{brake:true},.3);assert.ok(s.speed<speed*.1);
- step(s,{down:true},.6);assert.ok(s.speed<-4);const h=s.heading;step(s,{down:true,right:true},.1);assert.ok(s.heading<h);
- const forward=running();step(forward,{up:true},.5);const fh=forward.heading;step(forward,{up:true,right:true},.1);assert.ok(forward.heading>fh);
+test('jeep accelerates gradually, brakes, reverses and steers in both directions',()=>{
+ const s=running();step(s,{up:true},.5);assert.ok(s.speed>1&&s.speed<2.5);const speed=s.speed;step(s,{brake:true},.5);near(s.speed,0);assert.ok(speed>0);
+ step(s,{down:true},1.5);assert.ok(s.speed<-3);const h=s.heading;step(s,{down:true,right:true},.4);assert.ok(s.heading<h);
+ const forward=running();step(forward,{up:true},1);const fh=forward.heading;E.update(forward,{up:true,right:true},.02);
+ assert.ok(forward.steeringAngle>0&&forward.steeringAngle<.06);assert.ok(Math.abs(forward.heading-fh)<.005);
+ step(forward,{up:true,right:true},.3);assert.ok(forward.heading>fh);
 });
-test('jeep cabin, shoreline and outer boundaries stop motion',()=>{
- for(const [x,z,heading] of [[-4.6,-10,Math.PI/2],[-E.LAKE.rx*1.035-.1,E.WORLD.centerZ,Math.PI/2],[-E.WORLD.roadRadius*1.14+.1,E.WORLD.centerZ,-Math.PI/2]]){
-  const s=running();Object.assign(s,{x,z,heading,speed:14});E.update(s,{up:true},.05);near(s.x,x);near(s.z,z);assert.ok(s.speed<0);assert.equal(s.events.at(-1).type,'bump');
+test('jeep cabin, shoreline and outer boundaries stop without bouncing and permit reverse',()=>{
+ for(const [x,z,heading] of [[E.CABIN_BOUNDS.minX-.05,-10,Math.PI/2],[-E.LAKE.rx*1.035-.05,E.WORLD.centerZ,Math.PI/2],[-E.WORLD.roadRadius*1.14+.05,E.WORLD.centerZ,-Math.PI/2]]){
+  const s=running();Object.assign(s,{x,z,heading,speed:14});E.update(s,{up:true},.05);assert.ok(Math.abs(s.speed)<.1);assert.equal(s.events.at(-1).type,'bump');
+  step(s,{up:true},.5);assert.ok(s.speed<.15,'Holding throttle against wall must not bounce');
+  const impact={x:s.x,z:s.z};step(s,{down:true},1);assert.ok(s.speed<0);assert.ok(Math.hypot(s.x-impact.x,s.z-impact.z)>.5);
  }
 });
 test('collision notices are rate limited',()=>{
@@ -81,8 +85,8 @@ test('expanded lake has four times the original area and preserves cabin landmar
  near(E.roadRadius(0,E.WORLD.centerZ-E.WORLD.roadRadius),1);
  const jeep=running(),plane=running('plane');assert.deepEqual([jeep.x,jeep.z],[E.roadPoint(-1.82).x,E.roadPoint(-1.82).z]);assert.deepEqual([plane.x,plane.z],[-40,218]);
 });
-test('larger world preserves jeep and floatplane speed limits',()=>{
- for(const [input,limit] of [[{up:true},14],[{up:true,boost:true},19],[{down:true},-6]]){
+test('jeep raised speed limits and floatplane limit are enforced',()=>{
+ for(const [input,limit] of [[{up:true},22],[{up:true,boost:true},28],[{down:true},-6]]){
   const s=running();for(let i=0;i<1000;i++){s.x=-E.WORLD.roadRadius;s.z=E.WORLD.centerZ;E.update(s,input,.02);}
   near(s.speed,limit);
  }
@@ -115,7 +119,7 @@ test('tunnel walls block jeep and allow reversing back to road center',()=>{
  for(const side of [-1,1]){
   const a=.2,p=E.roadPoint(a),offset=side*(E.TUNNEL.innerHalfWidth-1.3);
   const s=running();Object.assign(s,{x:p.x+Math.sin(a)*offset,z:p.z-Math.cos(a)*offset,heading:side===1?a:a+Math.PI,speed:14});
-  const x=s.x,z=s.z;E.update(s,{up:true},.05);near(s.x,x);near(s.z,z);assert.ok(s.speed<0);assert.match(s.events.at(-1).text,/Tunnel/);
+  const x=s.x,z=s.z;E.update(s,{up:true},.05);assert.ok(Math.hypot(s.x-x,s.z-z)<.11);assert.ok(Math.abs(s.speed)<.1);assert.match(s.events.at(-1).text,/Tunnel/);
   step(s,{down:true},.5);assert.ok(Math.abs(E.roadOffset(s.x,s.z))<Math.abs(offset));
  }
 });
@@ -128,8 +132,8 @@ test('plane clears the elevated ridge and tunnel rock without exceeding ceiling'
 });
 test('driveway levels and terrain road shoulder are continuous',()=>{
  for(const p of E.DRIVEWAY.slice(1))near(E.terrainHeight(p.x,p.z),p.y);
- const a=.2,p=E.roadPoint(a);for(const offset of [-5,5])near(E.terrainHeight(p.x+Math.sin(a)*offset,p.z-Math.cos(a)*offset),p.y);
- const s=running();Object.assign(s,E.roadPoint(-.4),{heading:Math.atan2(E.roadPoint(-.399).x-E.roadPoint(-.4).x,E.roadPoint(-.4).z-E.roadPoint(-.399).z)});E.update(s,{},.02);assert.ok(s.pitch>.05);
+ const a=.2,p=E.roadPoint(a);for(const offset of [-6,6])near(E.terrainHeight(p.x+Math.sin(a)*offset,p.z-Math.cos(a)*offset),p.y);
+ const s=running();Object.assign(s,E.roadPoint(-.4),{heading:Math.atan2(E.roadPoint(-.399).x-E.roadPoint(-.4).x,E.roadPoint(-.4).z-E.roadPoint(-.399).z)});E.update(s,{},.02);assert.ok(s.pitch<.05);step(s,{},.7);assert.ok(s.pitch>.05);
 });
 
 test('plane boundary warns, permits manual return and resets countdown',()=>{
@@ -162,4 +166,51 @@ test('flight dynamic state resets on switching, mooring and restart',()=>{
  Object.assign(s,{actionReady:true,throttle:.7,propRPM:2200,verticalSpeed:3,yawRate:.4});E.action(s);
  assert.equal(s.parked,true);for(const k of ['throttle','propRPM','verticalSpeed','yawRate'])near(s[k],0);
  E.begin(s,'plane');assert.equal(s.parked,false);assert.equal(s.boundaryStatus,'inside');near(s.throttle,0);
+});
+
+test('jeep simulation is consistent at 30, 60 and 120 fps',()=>{
+ const simulate=fps=>{
+  const s=running();
+  for(const [seconds,input] of [[3,{up:true}],[.5,{up:true,right:true}],[2,{up:true}],[1,{brake:true}],[1,{down:true,left:true}]])for(let i=0;i<Math.round(seconds*fps);i++)E.update(s,input,1/fps);
+  return s;
+ };
+ const reference=simulate(120);
+ for(const fps of [30,60]){const s=simulate(fps);for(const k of ['x','y','z','speed','heading','steeringAngle','pitch','roll','suspensionVelocity'])near(s[k],reference[k],1e-8);}
+});
+test('high-speed steering respects grip and returns to center smoothly',()=>{
+ const s=running();s.speed=22;const initial=s.heading;E.update(s,{right:true,up:true},1/60);
+ assert.ok(s.steeringAngle>0&&s.steeringAngle<.02);assert.ok(s.heading-initial<.003);
+ for(let i=0;i<120;i++){s.x=-E.WORLD.roadRadius;s.z=E.WORLD.centerZ;E.update(s,{right:true,up:true},1/120);assert.ok(Math.abs(s.yawRate*s.speed)<=E.JEEP.maxLateralAcceleration+.01);}
+ const angle=s.steeringAngle;E.update(s,{up:true},1/120);assert.ok(s.steeringAngle<angle&&s.steeringAngle>angle*.8);
+ for(let i=0;i<120;i++){s.x=-E.WORLD.roadRadius;s.z=E.WORLD.centerZ;E.update(s,{up:true},1/120);}assert.ok(Math.abs(s.steeringAngle)<.001);
+});
+test('braking from boosted speed is gradual and stops without unintended reverse',()=>{
+ const s=running();Object.assign(s,{speed:28,acceleration:0});
+ E.update(s,{brake:true},1/60);assert.ok(s.speed>27&&s.speed<28);
+ for(let i=0;i<600;i++){s.x=-E.WORLD.roadRadius;s.z=E.WORLD.centerZ;E.update(s,{brake:true},1/120);assert.ok(s.speed>=0);}
+ near(s.speed,0);step(s,{down:true},1);assert.ok(s.speed<0);
+ const boost=running();boost.speed=28;E.update(boost,{up:true},.02);assert.ok(boost.speed>27.9,'Releasing boost must not instantly lose6 m/s');
+});
+test('new cabin foundation is flat and expanded footprint blocks jeep and protects plane',()=>{
+ for(let x=-2.8;x<=23.8;x+=2)for(let z=-26.4;z<=-6.5;z+=2)near(E.terrainHeight(x,z),1.1);
+ for(const p of E.DRIVEWAY.slice(1))near(E.terrainHeight(p.x,p.z),p.y);
+ const s=running();Object.assign(s,{x:24,z:-28.05,heading:Math.PI,speed:10});E.update(s,{up:true},.05);assert.ok(s.z<=E.CABIN_BOUNDS.minZ);assert.ok(s.speed<.1);
+ const plane=running('plane');Object.assign(plane,{x:24,z:-25,y:3,onWater:false});E.update(plane,{},.02);assert.ok(plane.y>=15);
+});
+
+test('keyboard lane following remains controlled at raised speed through slopes and tunnel',()=>{
+ const s=running(),lane=1.9;let last=-1.82,progress=0,peak=0,maxGroundError=0;
+ for(let i=0;i<20000&&progress<Math.PI*2;i++){
+  const a=Math.atan2(s.x,E.WORLD.centerZ-s.z),p=E.roadPoint(a+.09);
+  p.x+=Math.sin(a+.09)*lane;p.z-=Math.cos(a+.09)*lane;
+  const target=Math.atan2(p.x-s.x,s.z-p.z),error=Math.atan2(Math.sin(target-s.heading-s.yawRate*.18),Math.cos(target-s.heading-s.yawRate*.18));
+  const oldPitch=s.pitch,oldRoll=s.roll;
+  E.update(s,{up:s.speed<22,left:error<-.01,right:error>.01},1/60);
+  const angle=Math.atan2(s.x,E.WORLD.centerZ-s.z);progress+=Math.atan2(Math.sin(angle-last),Math.cos(angle-last));last=angle;
+  if(progress>.15)assert.ok(Math.abs(E.roadOffset(s.x,s.z)-lane)<1.6,'Must remain in the selected lane corridor');
+  assert.ok(Math.abs(s.pitch-oldPitch)<.025&&Math.abs(s.roll-oldRoll)<.025,'Suspension rotations must not jump');
+  maxGroundError=Math.max(maxGroundError,Math.abs(s.y-E.terrainHeight(s.x,s.z)));peak=Math.max(peak,s.speed);
+ }
+ assert.ok(progress>=Math.PI*2);assert.ok(peak>21.9&&peak<=22);assert.ok(maxGroundError<.08);
+ assert.ok(!s.events.some(e=>e.type==='bump'),'Raised-speed route must stay clear of tunnel walls and boundaries');
 });

@@ -4,6 +4,8 @@ import {CameraRig} from './camera-rig.js';
 import {CameraObstruction} from './camera-collision.js';
 import {createTerrainMaterial,createRockMaterial} from './landscape-materials.js';
 import {createFlightBarrier,createPropellerBlur} from './flight-effects.js';
+import {createRoadRibbonGeometry,createGravelMaterial} from './road-surfaces.js';
+import {RoadDust} from './road-dust.js';
 import {HDRLoader} from 'three/addons/loaders/HDRLoader.js';
 import {Water} from './vendor/Water.js';
 import * as E from './engine.js';
@@ -78,24 +80,18 @@ const ground=new THREE.Mesh(groundGeo,terrainMaterial);ground.receiveShadow=true
 tunnel.updateMatrixWorld(true);tunnel.traverse(o=>{if(o.isMesh)cameraObstacles.push(o);});
 const asphaltMaterial=new THREE.MeshStandardMaterial({...createAsphaltMaps(),color:0xffffff});
 function ribbon(points,width,color,y=.025,material=null,add=true){
- const positions=[],uv=[],indices=[];let distance=0;
- for(let i=0;i<points.length;i++){
-  const p=points[i],prev=points[Math.max(0,i-1)],next=points[Math.min(points.length-1,i+1)],dx=next.x-prev.x,dz=next.z-prev.z,len=Math.hypot(dx,dz)||1;
-  if(i)distance+=Math.hypot(p.x-prev.x,p.z-prev.z);
-  for(const side of [-1,1]){const x=p.x-dz/len*width/2*side,z=p.z+dx/len*width/2*side;positions.push(x,E.terrainHeight(x,z)+y,z);uv.push(side===-1?0:1,distance/4);}
-  if(i<points.length-1){const a=i*2;indices.push(a,a+1,a+2,a+1,a+3,a+2);}
- }
- const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();
+ const g=createRoadRibbonGeometry(points,width,{offset:y});
  const o=new THREE.Mesh(g,material||new THREE.MeshStandardMaterial({color,roughness:.95,side:THREE.DoubleSide}));o.receiveShadow=true;if(add)scene.add(o);return o;
 }
+const gravelMaterial=createGravelMaterial(),roadDust=new RoadDust();scene.add(roadDust);
 const roadPts=Array.from({length:641},(_,i)=>E.roadPoint(i/640*Math.PI*2));
-ribbon(roadPts,9,0x777a70,.018);ribbon(roadPts,7,0x363c3b,.065,asphaltMaterial);ribbon(E.DRIVEWAY,4.5,0x8b8b77,.10);
+ribbon(roadPts,10.4,0x777a70,.06,gravelMaterial);ribbon(roadPts,8.4,0x363c3b,.09,asphaltMaterial);ribbon(E.DRIVEWAY,4.5,0x8b8b77,.10,gravelMaterial);
 const roadMarks=[];
-for(let i=0;i<640;i+=5)roadMarks.push(ribbon([roadPts[i],roadPts[i+1]],.11,0xdedbd0,.078,null,false).geometry);
+for(let i=0;i<640;i+=5)roadMarks.push(ribbon([roadPts[i],roadPts[i+1]],.11,0xdedbd0,.106,null,false).geometry);
 const centerLine=new THREE.Mesh(mergeGeometries(roadMarks),new THREE.MeshStandardMaterial({color:0xdedbd0,roughness:.9,side:THREE.DoubleSide}));centerLine.receiveShadow=true;scene.add(centerLine);roadMarks.forEach(g=>g.dispose());
 // Roadside posts make the finite drivable edge legible, not an invisible wall.
 const postG=new THREE.CylinderGeometry(.065,.08,1,5),postM=new THREE.MeshStandardMaterial({color:0xd7cbb0});const posts=new THREE.InstancedMesh(postG,postM,192);const dummy=new THREE.Object3D();
-for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),x=p.x+5*Math.sin(a),z=p.z-5*Math.cos(a);dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
+for(let i=0;i<192;i++){const a=i/192*Math.PI*2,p=E.roadPoint(a),x=p.x+6.3*Math.sin(a),z=p.z-6.3*Math.cos(a);dummy.position.set(x,E.terrainHeight(x,z)+.5,z);dummy.updateMatrix();posts.setMatrixAt(i,dummy.matrix);}scene.add(posts);
 // Detailed needle cards and real trunks arranged around the mountain road.
 scene.add(createForest(landHeight,E.roadRadius));
 let seed=839;const random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
@@ -154,8 +150,9 @@ function frame(t){const dt=Math.min((t-last)/1000||0,.05);last=t;visual+=dt;cons
    cameraRig.setEnabled(state.status==='running');cameraRig.update(state,dt);
   }
   if(propeller){const rpm=state.phase==='plane'&&!state.parked?(state.propRPM||0):0;if(state.status==='running')propeller.rotation.z=(propeller.rotation.z+dt*rpm*Math.PI*2/60)%(Math.PI*2);if(propellerBlur){propellerBlur.material.uniforms.amount.value=THREE.MathUtils.clamp((rpm-700)/1500,0,1);propellerBlur.material.uniforms.phase.value=propeller.rotation.z*.27;}}
-  if(state.phase==='jeep'&&state.status==='running')for(const wheel of wheels){wheel.rotation.order='YXZ';wheel.rotation.x-=state.speed*dt/.588;if(wheel.name.includes('Front'))wheel.rotation.y=-((input.right?1:0)-(input.left?1:0))*.28;}
+  if(state.phase==='jeep'&&state.status==='running')for(const wheel of wheels){wheel.rotation.order='YXZ';wheel.rotation.x-=state.speed*dt/.588;if(wheel.name.includes('Front'))wheel.rotation.y=-(state.steeringAngle||0);}
  }
+ roadDust.update(state,state.status==='running'?dt:0);
  water.material.uniforms.time.value+=dt*.55;
  flightBarrier.visible=state.phase==='plane'&&state.status==='running'&&state.boundaryStatus!=='inside';flightBarrier.material.uniforms.strength.value=state.boundaryStatus==='warning'?.7:1;flightBarrier.material.uniforms.outside.value=state.boundaryStatus==='warning'?0:1;flightBarrier.material.uniforms.time.value=visual;
  for(const ev of state.events.splice(0))toast(ev.text);toastLife-=dt;if(toastLife<=0)$('#toast').classList.remove('visible');

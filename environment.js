@@ -22,7 +22,7 @@ export function createLandscapeGeometry(){
  for(const r of [0,.88,.94,.97,.985,1,1.015,1.035])sections.push({kind:'lake',r});
  // Resolve the carved driveway and parking apron rather than bridging them with long triangles.
  for(let i=1;i<=48;i++)sections.push({kind:'inland',t:i/48});
- for(const offset of [-4,-3.5,0,3.5,4,6])sections.push({kind:'road',offset});
+ for(const offset of [-5.2,-4.2,0,4.2,5.2,6.5])sections.push({kind:'road',offset});
  for(const r of [1.075,1.12,1.17,1.24,1.34,1.48,1.65,1.85,2.1,2.45,2.9,3.5])sections.push({kind:'outer',r});
  const c=new THREE.Color();
  for(let row=0;row<sections.length;row++){
